@@ -39,6 +39,14 @@ class Storategy:
         self.trend = 0#0 don't have, 1 long_position, -1 short_position
              
         
-    def run(self) -> ts.Signal:
+    def run(self, long_short = None) -> ts.Signal:
+        """ run this storategy
+
+        Args:
+            long_short (int, optional): represents the trend. When manually or other storategy buy/sell, you can pass 1/-1 to this storategy. Defaults to None.
+
+        Returns:
+            ts.Signal: Signal of this strategy
+        """
         self.logger.debug("run base storategy for testing.")
         return ts.Signal(std_name="base")
