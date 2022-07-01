@@ -1,8 +1,5 @@
-from turtle import position
 from trade_storategy.storategies.strategy_base import Storategy
-from trade_storategy.signal import *
-import finance_client as fc
-import json
+import modules.finance_client as fc
 
 class EMACross(Storategy):
     pass
@@ -41,7 +38,7 @@ class MACDCross(Storategy):
         if macd_process == None:
             macd = fc.utils.MACDpreProcess()
         else:
-            if macd.kinds == "MACD":
+            if macd_process.kinds == "MACD":
                 macd = macd_process
             else:
                 raise Exception("MACDCross accept only MACDProcess")
@@ -82,6 +79,9 @@ class MACDCross(Storategy):
                     self.logger.info("Buy signal raised.")
                     signal = BuySignal(self.key, price=price)
             return signal
+
+    def raise_signal(self):
+        self.create_signal()
             
 class MACDRenko(Storategy):
     

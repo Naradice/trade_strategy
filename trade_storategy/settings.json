@@ -19,7 +19,7 @@
                 "class": "logging.FileHandler",
                 "level": "DEBUG",
                 "formatter": "simple",
-                "filename": "trade_storategy"
+                "filename": "trade_storategy.log"
             }
         },
 
