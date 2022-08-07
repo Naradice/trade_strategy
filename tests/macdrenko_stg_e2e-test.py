@@ -20,16 +20,18 @@ logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_storategy.test")
 
-file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data_source/bitcoin_5_2017T0710-2021T103022.csv'))
+file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min5.csv'))
+date_column = "Time"
 
 class Test(unittest.TestCase):
+    
     def test_MACDWidthCSV(self):
-        client = CSVClient(file=file_path, auto_index=True, start_index=7500, logger=logger)
-        macd_p = MACDpreProcess()
-        renko_p = RenkoProcess(window=120)
-        st1 = ts.storategies.MACDRenko(client, interval_mins=0.1, renko_process=renko_p, macd_process=macd_p, logger=logger)
-        manager = ts.ParallelStorategyManager([st1], minutes=10, logger=logger)
+        client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage")
+        macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9)
+        renko_p = RenkoProcess(window=60, date_column=date_column)
+        st1 = ts.storategies.MACDRenko(client, interval_mins=0, renko_process=renko_p, macd_process=macd_p,data_length=120, slope_window=18, logger=logger)
+        manager = ts.ParallelStorategyManager([st1], minutes=30, logger=logger)
         manager.start_storategies()
-        
+            
 if __name__ == '__main__':
     unittest.main()

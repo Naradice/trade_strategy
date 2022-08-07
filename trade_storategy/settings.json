@@ -38,6 +38,11 @@
                 "level": "DEBUG",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
+            },
+            "trade_storategy.back_test": {
+                "level": "DEBUG",
+                "handlers": ["consoleHandler", "fileHandler"],
+                "propagate": false
             }
         },
     

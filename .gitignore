@@ -16,3 +16,4 @@ __pycache__/
 /dist
 *trade_storategy*.logs
 tests/mt5*
+trade/

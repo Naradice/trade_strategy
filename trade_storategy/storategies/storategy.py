@@ -68,7 +68,7 @@ class MACDCross(Storategy):
                 self.current_trend = tick_trend
                 if long_short == 1:
                     self.logger.info("CloseSell signal raised.")
-                    signal = CloseSellSignal(self.key, price=price)
+                    signal = CloseSellSignal(self.key, amount=self.amount, price=price)
                 else:
                     self.logger.info("Sell signal raised.")
                     signal = SellSignal(self.key, price=price)
@@ -77,15 +77,82 @@ class MACDCross(Storategy):
                 self.current_trend = tick_trend
                 if long_short == -1:
                     self.logger.info("CloseBuy signal raised.")
-                    signal = CloseBuySignal(self.key, price=price)
+                    signal = CloseBuySignal(self.key, amount=self.amount, price=price)
                 else:
                     self.logger.info("Buy signal raised.")
-                    signal = BuySignal(self.key, price=price)
+                    signal = BuySignal(self.key, amount=self.amount, price=price)
             return signal
             
 class MACDRenko(Storategy):
     
     key = "macd_renko"
+    
+    def __init__(self, financre_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, slope_window = 5, interval_mins: int = -1, amount=1, data_length=250, logger=None) -> None:
+        super().__init__(financre_client, interval_mins, amount, data_length, logger)
+        
+        if renko_process.kinds != "Renko":
+            if financre_client.have_process(fc.utils.RenkoProcess()) is False:
+                raise Exception("renko_process accept only RenkoProcess")
+            
+        if macd_process.kinds != "MACD":
+            if financre_client.have_process(fc.utils.MACDpreProcess()) is False:
+                raise Exception("macd_process accept only MACDProcess")
+            
+        self.macd_column_column = macd_process.columns["MACD"]
+        self.macd_signal_column = macd_process.columns["Signal"]
+        self.renko_bnum_column = renko_process.columns["NUM"]
+        column_dict = self.client.get_ohlc_columns()
+        if type(column_dict) == dict:
+            self.close_column_name = column_dict["Close"]
+        else:
+            self.close_column_name = "Close"
+        
+        macd_slope = fc.utils.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
+        signal_slope = fc.utils.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
+        self.slope_macd_column = macd_slope.columns["Slope"]
+        self.slope_signal_column = signal_slope.columns["Slope"]
+        
+        financre_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
+
+        
+    def run(self, long_short: int = None, data_df = None):
+        if data_df is None:
+            df = self.client.get_rate_with_indicaters(self.data_length)
+        else:
+            df = data_df
+        if long_short == None:
+            long_short = self.trend#0 by default
+        signal = None
+        if len(df) > 0:
+            last_df = df.iloc[-1]
+            self.logger.debug(f"{last_df[self.renko_bnum_column]}, {last_df[self.macd_column_column]}, {last_df[self.macd_signal_column]}, {last_df[self.slope_macd_column]}, {last_df[self.slope_signal_column]}")
+            if long_short == 0:
+                if last_df[self.renko_bnum_column]>=2 and last_df[self.macd_column_column]>last_df[self.macd_signal_column] and last_df[self.slope_macd_column]>last_df[self.slope_signal_column]:
+                    signal = BuySignal(std_name=self.key, amount=self.amount, price=df[self.close_column_name].iloc[-1])
+                    self.trend = 1
+                elif last_df[self.renko_bnum_column]<=-2 and last_df[self.macd_column_column]<last_df[self.macd_signal_column] and last_df[self.slope_macd_column]<last_df[self.slope_signal_column]:
+                    signal = SellSignal(std_name=self.key, amount=self.amount, price=df[self.close_column_name].iloc[-1])
+                    self.trend = -1
+                        
+            elif long_short == 1:
+                if last_df[self.renko_bnum_column]<=-2 and last_df[self.macd_column_column]<last_df[self.macd_signal_column] and last_df[self.slope_macd_column]<last_df[self.slope_signal_column]:
+                    signal = CloseSellSignal(std_name=self.key, amount=self.amount, price=df[self.close_column_name].iloc[-1])
+                    self.trend = -1
+                elif last_df[self.macd_column_column]<last_df[self.macd_signal_column] and last_df[self.slope_macd_column]<last_df[self.slope_signal_column]:
+                    signal = CloseSignal(std_name=self.key)
+                    self.trend = 0
+            elif long_short == -1:
+                if last_df[self.renko_bnum_column]>=2 and last_df[self.macd_column_column]>last_df[self.macd_signal_column] and last_df[self.slope_macd_column]>last_df[self.slope_signal_column]:
+                    signal = CloseBuySignal(std_name=self.key,  amount=self.amount, price=df[self.close_column_name].iloc[-1])
+                    self.trend = 1
+                elif last_df[self.macd_column_column]>last_df[self.macd_signal_column] and last_df[self.slope_macd_column]>last_df[self.slope_signal_column]:
+                    signal = CloseSignal(std_name=self.key)
+                    self.trend = 0
+        return signal
+    
+class MACDRenkoWave(Storategy):
+    
+    key = "macd_renko_wave"
     
     def __init__(self, financre_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, slope_window = 5, interval_mins: int = -1, data_length=250, logger=None) -> None:
         super().__init__(financre_client, interval_mins, data_length, logger)
@@ -136,17 +203,189 @@ class MACDRenko(Storategy):
                     signal = CloseSellSignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
                     self.trend = -1
                 elif last_df[self.macd_column_column]<last_df[self.macd_signal_column] and last_df[self.slope_macd_column]<last_df[self.slope_signal_column]:
-                    signal = CloseSignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
-                    self.trend = 0
+                    signal = CloseSellSignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
+                    self.trend = -1
             elif long_short == -1:
                 if last_df[self.renko_bnum_column]>=2 and last_df[self.macd_column_column]>last_df[self.macd_signal_column] and last_df[self.slope_macd_column]>last_df[self.slope_signal_column]:
                     signal = CloseBuySignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
                     self.trend = 1
                 elif last_df[self.macd_column_column]>last_df[self.macd_signal_column] and last_df[self.slope_macd_column]>last_df[self.slope_signal_column]:
-                    signal = CloseSignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
-                    self.trend = 0
+                    signal = CloseBuySignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
+                    self.trend = 1
         return signal
     
+class MACDRenkoByBB(MACDRenko):
+    
+    key = "bmacd_renko"
+    
+    def __init__(self, financre_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, bolinger_process:fc.utils.BBANDpreProcess, slope_window = 5, amount=1, deviation_rate=0.2, tp:str = "none", sl:str = "BB", interval_mins: int = -1, data_length=250, logger=None) -> None:
+        """
+        add condition to open a position by Bolinger Band
+        
+        Args:
+            financre_client (fc.Client): Cliet
+            renko_process (fc.utils.RenkoProcess): Renko Process of finance_client module
+            macd_process (fc.utils.MACDpreProcess): MACD Process of finance_client module
+            bolinger_process (fc.utils.BBANDpreProcess): BB Process of finance_client module
+            slope_window (int, optional): window to caliculate window of the close. Defaults to 5.
+            deviation_rate (float, optional): rate of condition to open position or not. Defaults to 0.2. Ex) (current_value - High BBandValue)/BBandWidth >= deviation_rate, cancel the signal or change it to stop_order
+            tp (str, optional): Specify a method to add tp vaelue. If not to be specified, "none". Defaults to BB. ["BB", "none", "Fix Ratio"]
+            interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
+            data_length (int, optional): Length to caliculate the indicaters. Defaults to 250.
+            logger (optional): You can pass your logger. Defaults to None.
+        """
+        ##check if bolinger_process is an instannce of BBANDpreProcess
+        super().__init__(financre_client=financre_client, renko_process=renko_process, macd_process=macd_process, slope_window=slope_window , interval_mins=interval_mins, amount=amount, data_length=data_length, logger=logger)
+        
+        ##initialize required columns
+        self.bolinger_columns = bolinger_process.columns
+        self.__add_tp_by_bb = tp == "BB"
+        if self.__add_tp_by_bb:
+            self.logger.info("use bolinger band to add tp value.")
+        self.__add_sl_by_bb = sl == "BB"
+        if self.__add_sl_by_bb:
+            self.logger.info("use bolinger band to add sl value.")
+        ## add BBANDPreProcess
+        self.client.add_indicater(bolinger_process)
+
+        
+    def run(self, long_short: int = None):
+        df = self.client.get_rate_with_indicaters(self.data_length)
+        signal = super().run(long_short, df)
+        #if signal is raised
+        if signal is not None:
+            #check bolinger band range
+            if signal.is_buy is True:
+                self.logger.info("buy signal is raised. Start checking a BBAND.")
+                upper_rate = df.iloc[-1][self.bolinger_columns["UB"]]
+                current_rate = self.client.get_current_ask()
+                if current_rate > upper_rate:
+                    self.logger.info(f"current rate {current_rate} is greater than BB upper value {upper_rate}. Cancel a buy signal.")
+                    if signal.is_close:
+                        signal = CloseSignal(signal.key)
+                    else:
+                        signal = None
+                    self.trend = 0
+                else:
+                    if self.__add_tp_by_bb:
+                        self.logger.info(f"added tp: {upper_rate}")
+                        signal.tp = upper_rate
+                    if self.__add_sl_by_bb:
+                        mean_value = df.iloc[-1][self.bolinger_columns["MB"]]
+                        if current_rate > mean_value:
+                            self.logger.info(f"added sl by mean_value: {mean_value}")
+                            signal.sl = mean_value
+                        else:
+                            lower_value = df.iloc[-1][self.bolinger_columns["LB"]]
+                            self.logger.info(f"added sl by lower_value: {lower_value}")
+                            signal.sl = lower_value
+                    
+            elif signal.is_buy is False:#sell case
+                self.logger.info("sell signal is raised. Start checking a BBAND.")
+                lower_rate = df.iloc[-1][self.bolinger_columns["LB"]]
+                current_rate = self.client.get_current_bid()
+                if current_rate < lower_rate:
+                    self.logger.info(f"current rate {current_rate} is lower than BB lower value {lower_rate}. Cancel a sell signal.")
+                    if signal.is_close:
+                        signal = CloseSignal(signal.key)
+                    else:
+                        signal = None
+                    self.trend = 0
+                else:
+                    if self.__add_tp_by_bb:
+                        self.logger.info(f"added tp: {lower_rate}")
+                        signal.tp = lower_rate
+                    if self.__add_sl_by_bb:
+                        mean_value = df.iloc[-1][self.bolinger_columns["MB"]]
+                        if current_rate < mean_value:
+                            self.logger.info(f"added sl by mean_value: {mean_value}")
+                            signal.sl = mean_value
+                        else:
+                            upper_value = df.iloc[-1][self.bolinger_columns["UB"]]
+                            self.logger.info(f"added sl by upper_value: {upper_value}")
+                            signal.sl = upper_value
+                    
+                    
+            elif signal.is_close:
+                pass
+            else:            
+                self.logger.error(f"unkown signal type {signal.is_buy}")
+                signal = None
+                self.trend = 0
+        return signal
+
+class MACDRenkoSLByBB(MACDRenko):
+    
+    key = "bmacd_renko"
+    
+    def __init__(self, financre_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, bolinger_process:fc.utils.BBANDpreProcess, slope_window = 5, amount=1, deviation_rate=0.2, interval_mins: int = -1, data_length=250, logger=None) -> None:
+        """
+        add condition to open a position by Bolinger Band
+        
+        Args:
+            financre_client (fc.Client): Cliet
+            renko_process (fc.utils.RenkoProcess): Renko Process of finance_client module
+            macd_process (fc.utils.MACDpreProcess): MACD Process of finance_client module
+            bolinger_process (fc.utils.BBANDpreProcess): BB Process of finance_client module
+            slope_window (int, optional): window to caliculate window of the close. Defaults to 5.
+            deviation_rate (float, optional): rate of condition to open position or not. Defaults to 0.2. Ex) (current_value - High BBandValue)/BBandWidth >= deviation_rate, cancel the signal or change it to stop_order
+            tp (str, optional): Specify a method to add tp vaelue. If not to be specified, "none". Defaults to BB. ["BB", "none", "Fix Ratio"]
+            interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
+            data_length (int, optional): Length to caliculate the indicaters. Defaults to 250.
+            logger (optional): You can pass your logger. Defaults to None.
+        """
+        ##check if bolinger_process is an instannce of BBANDpreProcess
+        super().__init__(financre_client=financre_client, renko_process=renko_process, macd_process=macd_process, slope_window=slope_window , interval_mins=interval_mins, amount=amount, data_length=data_length, logger=logger)
+        
+        ##initialize required columns
+        self.bolinger_columns = bolinger_process.columns
+        ## add BBANDPreProcess
+        self.client.add_indicater(bolinger_process)
+
+        
+    def run(self, long_short: int = None):
+        df = self.client.get_rate_with_indicaters(self.data_length)
+        signal = super().run(long_short, df)
+        #if signal is raised
+        if signal is not None:
+            #check bolinger band range
+            if signal.is_buy is True:
+                self.logger.info("buy signal is raised. Start adding a sl")
+                lower_value = df.iloc[-1][self.bolinger_columns["LB"]]
+                current_rate = self.client.get_current_ask()
+                mean_value = df.iloc[-1][self.bolinger_columns["MB"]]
+                if current_rate > mean_value:
+                    self.logger.info(f"added sl by mean_value: {mean_value}")
+                    signal.sl = mean_value
+                elif current_rate > lower_value:
+                    self.logger.info(f"added sl by lower_value: {lower_value}")
+                    signal.sl = lower_value
+                else:
+                    self.logger.info("don't add the sl as current value is too low")
+                    
+            elif signal.is_buy is False:#sell case
+                self.logger.info("sell signal is raised. Start adding a sl")
+                current_rate = self.client.get_current_bid()
+                mean_value = df.iloc[-1][self.bolinger_columns["MB"]]
+                upper_value = df.iloc[-1][self.bolinger_columns["UB"]]
+                if current_rate < mean_value:
+                    self.logger.info(f"added sl by mean_value: {mean_value}")
+                    signal.sl = mean_value
+                elif current_rate < upper_value:
+                    self.logger.info(f"added sl by upper_value: {upper_value}")
+                    signal.sl = upper_value
+                else:
+                    self.logger.info("don't add sl as current value is too high")
+                    
+            elif signal.is_close:
+                pass
+            
+            else:            
+                self.logger.error(f"unkown signal type {signal.is_buy}")
+                signal = None
+                self.trend = 0
+                
+        return signal
 class CCICross(Storategy):
     
     key = "cci_cross"

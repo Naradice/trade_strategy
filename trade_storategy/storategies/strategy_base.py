@@ -8,7 +8,7 @@ class Storategy:
     key = "base"
     client: fc.Client = None
     
-    def __init__(self, financre_client: fc.Client, interval_mins:int=-1, data_length:int = 100, logger=None) -> None:
+    def __init__(self, financre_client: fc.Client, interval_mins:int=-1, amount=1, data_length:int = 100, logger=None) -> None:
         if logger == None:
             try:
                 with open(os.path.abspath(os.path.join(os.path.dirname(__file__), '../settings.json')), 'r') as f:
@@ -16,20 +16,21 @@ class Storategy:
             except Exception as e:
                 self.logger.error(f"fail to load settings file on storategy: {e}")
                 raise e
-            
+    
             logger_config = settings["log"]
             
             try:
                 config.dictConfig(logger_config)
             except Exception as e:
-                self.logger.error(f"fail to set configure file on storategy: {e}")
+                print(f"fail to set configure file on storategy: {e}")
                 raise e
 
             logger_name = "trade_storategy.storategy"
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
-            
+        
+        self.amount = amount
         self.client = financre_client
         self.data_length = data_length
         if interval_mins < 0:

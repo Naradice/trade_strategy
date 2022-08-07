@@ -23,7 +23,7 @@ logger = getLogger("trade_storategy.test")
 file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data_source/bitcoin_5_2017T0710-2021T103022.csv'))
 
 class Test(unittest.TestCase):
-    
+
     def test_CCICrossCSV(self):
         client = CSVClient(file=file_path, auto_index=True, start_index=7500, logger=logger)
         cci_process = CCIProcess()
