@@ -175,3 +175,24 @@ class SignalInfo:
                 self.signal = ValueRangeSignal(pricees=price, tp=tp, sl=sl,  possibilities=possibility)
         else:
             raise Exception(f"unkown signal info:: is_buy:{is_buy}, price: {price}")
+        
+def update_signal_with_close(signal:Signal, continuous_mode:str = None, std_name = None):
+    if std_name is None and signal is not None:
+        std_name = signal.std_name
+    
+    if isinstance(signal, BuySignal):
+        return CloseBuySignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, possibility=signal.possibility)
+    elif isinstance(signal, SellSignal):
+        return CloseSellSignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, possibility=signal.possibility)
+    elif signal is None:
+        if continuous_mode is None:
+            return CloseSignal(std_name=std_name)
+        elif continuous_mode == "long" or continuous_mode == "ask":
+            return CloseBuySignal(std_name=std_name)
+        elif continuous_mode == "short" or continuous_mode == "bid":
+            return CloseSellSignal(std_name=std_name)
+    else:
+        if signal.is_close is not None and signal.is_close == False:
+            # need to implement pending case
+            raise Exception(f"{signal} can't be updated with close.")
+        return signal

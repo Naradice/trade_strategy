@@ -20,39 +20,25 @@ logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_storategy.back_test")
 
-file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min30.csv'))
-date_column = "Time"
-
-def MACDRenkoByBBCSV():
-    client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage")
-    columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9)
-    renko_p = RenkoProcess(window=60, date_column=columns["Time"])
-    bb_p = BBANDpreProcess(window=14, alpha=3, target_column=columns["Close"])
-    st1 = ts.storategies.MACDRenkoByBB(client, renko_p, macd_p, bb_p, slope_window = 5, deviation_rate=0.2, sl = "BB", interval_mins = 0, data_length=120, logger=logger)
-    manager = ts.ParallelStorategyManager([st1], minutes=60*3, logger=logger)
-    manager.start_storategies()
-
-def MACDRenkoByBBMT5():
-    client = MT5Client(id=100000000, password="", server="", frame=30, auto_index=True, simulation=True)
-    columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9, target_column=columns["Close"])
-    renko_p = RenkoProcess(window=60, date_column=columns["Time"], ohlc_column=[columns["Open"], columns["High"], columns["Low"], columns["Close"]])
-    bb_p = BBANDpreProcess(window=14, alpha=3, target_column=columns["Close"])
-    st1 = ts.storategies.MACDRenkoByBB(client, renko_p, macd_p, bb_p, slope_window = 5, deviation_rate=0.2, sl = "BB", interval_mins = 0, data_length=120, logger=logger)
-    manager = ts.ParallelStorategyManager([st1], minutes=60*3, logger=logger)
-    manager.start_storategies()
+#file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min30.csv'))
+#date_column = "Time"
+file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_min5.csv'))
+date_column = "time"
+ohlc_column = ["high", "open", "low", "close"]
+#file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/bitcoin_5_2017T0710-2021T103022_5_30.csv'))
+#date_column = "Timestamp"
+#ohlc_column = ["High", "Open", "Low", "Close"]
 
 def MACDRenkoTPByBBCSV():
-    client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage")
+    client = CSVClient(file=file_path, frame=5, auto_index=True, start_index=0, logger=logger, columns=ohlc_column, date_column=date_column, slip_type="percentage")
     columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9)
-    renko_p = RenkoProcess(window=60, date_column=columns["Time"])
+    macd_p = MACDpreProcess(short_window=8, long_window=18, signal_window=6, target_column=columns["Close"])
+    renko_p = RenkoProcess(window=60, date_column=columns["Time"], ohlc_column=[columns["Open"], columns["High"], columns["Low"], columns["Close"]])
     bb_p = BBANDpreProcess(window=14, alpha=3, target_column=columns["Close"])
-    st1 = ts.storategies.MACDRenkoSLByBB(client, renko_p, macd_p, bb_p, slope_window = 5, deviation_rate=0.2, interval_mins = 0, data_length=120, logger=logger)
-    manager = ts.ParallelStorategyManager([st1], minutes=60*3, logger=logger)
+    st1 = ts.storategies.MACDRenkoSLByBB(financre_client=client, renko_process=renko_p, macd_process=macd_p, bolinger_process=bb_p, slope_window = 12, interval_mins = 0, use_tp=False, continuous=True, data_length=120, logger=logger)
+    manager = ts.ParallelStorategyManager([st1], minutes=60, logger=logger)
     manager.start_storategies()
-    
+
 if __name__ == '__main__':
     #MACDRenkoByBBMT5()
     #MACDRenkoByBBCSV()

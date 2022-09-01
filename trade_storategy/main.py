@@ -110,8 +110,11 @@ class ParallelStorategyManager:
         self.done = False
         
         for storategy in self.storategies:
-            t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
-            t.start()
+            if storategy.client.do_render:
+                self.__start_storategy(storategy)
+            else:
+                t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
+                t.start()
     
     def stop_storategies(self):
         self.done = True
