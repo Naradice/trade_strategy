@@ -26,7 +26,7 @@ date_column = "Time"
 class Test(unittest.TestCase):
     
     def test_MACDWidthCSV(self):
-        client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage")
+        client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage", do_render=True)
         macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9)
         renko_p = RenkoProcess(window=60, date_column=date_column)
         st1 = ts.storategies.MACDRenko(client, interval_mins=0, renko_process=renko_p, macd_process=macd_p,data_length=120, slope_window=18, logger=logger)

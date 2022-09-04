@@ -1,4 +1,3 @@
-from asyncio.log import logger
 import datetime
 import threading
 import time
@@ -9,7 +8,8 @@ import os
 
 class ParallelStorategyManager:
     
-    def __init__(self, storategies:list, days=0, hours=0, minutes=0, logger = None) -> None:
+    def __init__(self, storategies:list, days=0, hours=0, minutes=0,  logger = None) -> None:
+        self.event = threading.Event()
         if logger == None:
             dir = os.path.dirname(__file__)
             try:
@@ -91,7 +91,11 @@ class ParallelStorategyManager:
                 base_time = time.time()
                 next_time = ((base_time - time.time()) % interval) or interval
                 self.logger.debug(f"wait {sleep_time} to run on next frame")
-                time.sleep(next_time)
+                #time.sleep(next_time)
+                if self.event.wait(timeout=next_time):
+                    self.logger.log("Close all positions as for ending the storategies.")
+                    storategy.client.close_all_positions()
+                    break
         
         totalSignalCount = len(self.results[storategy.key])
         if totalSignalCount == 0:
@@ -115,6 +119,20 @@ class ParallelStorategyManager:
             else:
                 t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
                 t.start()
+                while True:
+                    try:
+                        ui = input("Please input 'Exit' to end the storategies.")
+                        if ui.lower() == 'Exit':
+                            self.event.set()
+                            self.done = True
+                            exit()
+                    except KeyboardInterrupt:
+                        self.logger.log("Finish the storategies as KeyboardInterrupt happened")
+                        self.event.set()
+                        self.done = True
+                        exit()
+                
+        
     
     def stop_storategies(self):
         self.done = True

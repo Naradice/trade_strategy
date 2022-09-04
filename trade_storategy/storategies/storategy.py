@@ -218,7 +218,7 @@ class MACDRenkoSLByBB(MACDRenko):
                             order_price = ask_value#assign to pass the condition
                         else:
                             order_price = signal.order_price
-                        lower_value = df.iloc[-1][self.bolinger_columns["LB"]]
+                        lower_value = df.iloc[-1][self.bolinger_columns["LV"]]
                         if df.iloc[-1][self.column_dict["Low"]] <= lower_value and ask_value <= lower_value + unit_width and ask_value <= order_price:
                             self.logger.debug(f"org signal is {signal}")
                             signal = update_signal_with_close(signal, std_name=self.key)
@@ -266,6 +266,7 @@ class MACDRenkoSLByBB(MACDRenko):
                 self.trend = 0
                 
         return signal
+
 class CCICross(Storategy):
     
     key = "cci_cross"
@@ -423,4 +424,85 @@ class CCIBoader(Storategy):
                     self.trend = 0
                     if long_short == 1:
                         signal = CloseSignal(std_name=self.key, price=df[self.close_column_name].iloc[-1])
+        return signal
+    
+class RangeTrade(Storategy):
+    
+    key = "range"
+    
+    def __init__(self, finance_client: fc.Client, range_process=None, alpha=1, interval_mins: int = -1, amount=1, data_length: int = 100, logger=None) -> None:
+        super().__init__(finance_client, interval_mins, amount, data_length, logger)
+        ohlc_columns = finance_client.get_ohlc_columns()
+        self.close_column = ohlc_columns["Close"]
+        self.high_column = ohlc_columns["High"]
+        self.low_column = ohlc_columns["Low"]
+        if range_process is None:
+            range_process = fc.utils.RangeTrendProcess()
+        bband_process = fc.utils.BBANDpreProcess(target_column=self.close_column, alpha=alpha)
+        if finance_client.have_process(bband_process) is False:
+            finance_client.add_indicater(bband_process)
+        if finance_client.have_process(range_process) is False:
+            finance_client.add_indicater(range_process)
+        ##initialize params of range indicater
+        temp = finance_client.do_render
+        finance_client.do_render = False
+        finance_client.get_rate_with_indicaters()
+        finance_client.do_render = temp
+        self.trend_possibility_column = range_process.columns["trend"]
+        self.range_possibility_column = range_process.columns["range"]
+        self.Width_column = bband_process.columns["Width"]
+        self.UV_column = bband_process.columns["UV"]
+        self.LV_column = bband_process.columns["LV"]
+        self.MV_column = bband_process.columns["MV"]
+        
+    def run(self):
+        df = self.client.get_rate_with_indicaters(self.data_length)
+        rp = df[self.range_possibility_column].iloc[-1]
+        signal = None
+        if rp >= 0.9:
+            tp = df[self.trend_possibility_column].iloc[-1]
+            self.logger.debug(f"tp, tp = {rp}, {tp}")
+
+            #pending order is not implemented for now...
+            if self.trend == 0:
+                if df[self.Width_column].iloc[-1] > 0.1:
+                    if df[self.UV_column].iloc[-1] < df[self.high_column].iloc[-1]:
+                    #if df[self.close_column].iloc[-1] < df[self.close_column].iloc[-2] and df[self.UV_column].iloc[-2] < df[self.high_column].iloc[-2]:
+                        signal = SellSignal(self.key, self.amount, df[self.close_column].iloc[-1], tp=df[self.LV_column].iloc[-1])
+                        self.trend = -1
+                    elif df[self.LV_column].iloc[-1] > df[self.low_column].iloc[-1]:
+                    #elif df[self.close_column].iloc[-1] > df[self.close_column].iloc[-2] and df[self.LV_column].iloc[-2] > df[self.low_column].iloc[-2]:
+                        signal = BuySignal(self.key, self.amount, df[self.close_column].iloc[-1], tp=df[self.UV_column].iloc[-1])
+                        self.trend = 1
+            elif self.trend == 1:
+                if tp < -0.15:
+                    if df[self.MV_column].iloc[-1] > df[self.low_column].iloc[-1]:
+                        signal = CloseSignal(self.key, df[self.close_column].iloc[-1])
+                        self.trend = 0
+                        self.logger.info("Colose signal as long position was opend for short trend")
+                elif tp < 0.15:
+                    if df[self.UV_column].iloc[-1] < df[self.high_column].iloc[-1]:
+                        signal = CloseSellSignal(self.key, self.amount, df[self.close_column].iloc[-1], tp=df[self.LV_column].iloc[-1])
+                        self.trend = -1
+                else:
+                    pass
+                #elif (df[self.close_column].iloc[-1] - df[self.close_column].iloc[-2])/2 < 0:   
+            else:
+                if tp < -0.15:
+                    pass
+                elif tp < 0.15:
+                    if df[self.LV_column].iloc[-1] > df[self.low_column].iloc[-1]:
+                        signal = CloseBuySignal(self.key, self.amount, df[self.close_column].iloc[-1], tp=df[self.UV_column].iloc[-1])
+                        self.trend = 1
+                else:
+                    if df[self.MV_column].iloc[-1] > df[self.high_column].iloc[-1]:
+                        signal = CloseSignal(self.key, df[self.close_column].iloc[-1])
+                        self.trend = 0
+                        self.logger.info("Colose signal as short position was opend for long trend")
+        else:
+            if self.trend != 0:
+                signal = CloseSignal(self.key, df[self.close_column].iloc[-1])
+                self.trend = 0
+                self.logger.info("Colose signal as range trend end.")
+
         return signal
