@@ -98,15 +98,13 @@ class ParallelStorategyManager:
                     break
         
         totalSignalCount = len(self.results[storategy.key])
-        if totalSignalCount == 0:
-            totalSignalCount = 1#avoid winCount/0
-        revenue = sum(self.results[storategy.key])
-        winList = list(filter(lambda x: x >= 0, self.results[storategy.key]))
-        winCount = len(winList)
-        winRevenute = sum(winList)
-        
-        resultTxt = f"{storategy.key}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}"
-        self.logger.info(resultTxt)
+        if totalSignalCount != 0:
+            revenue = sum(self.results[storategy.key])
+            winList = list(filter(lambda x: x >= 0, self.results[storategy.key]))
+            winCount = len(winList)
+            winRevenute = sum(winList)
+            resultTxt = f"{storategy.key}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+            self.logger.info(resultTxt)
             
     def start_storategies(self):
         self.__start_time = datetime.datetime.now()
@@ -115,19 +113,25 @@ class ParallelStorategyManager:
         
         for storategy in self.storategies:
             if storategy.client.do_render:
-                self.__start_storategy(storategy)
+                try:
+                    self.__start_storategy(storategy)
+                except KeyboardInterrupt:
+                    self.logger.info("Finish the storategies as KeyboardInterrupt happened")
+                    self.event.set()
+                    self.done = True
+                    exit()
             else:
                 t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
                 t.start()
                 while True:
                     try:
-                        ui = input("Please input 'Exit' to end the storategies.")
-                        if ui.lower() == 'Exit':
+                        ui = input("Please input 'exit' to end the storategies.")
+                        if ui.lower() == 'exit':
                             self.event.set()
                             self.done = True
                             exit()
                     except KeyboardInterrupt:
-                        self.logger.log("Finish the storategies as KeyboardInterrupt happened")
+                        self.logger.info("Finish the storategies as KeyboardInterrupt happened")
                         self.event.set()
                         self.done = True
                         exit()

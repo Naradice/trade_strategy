@@ -15,26 +15,27 @@ except Exception as e:
     raise e
 logger_config = settings["log"]
 log_file_base_name = logger_config["handlers"]["fileHandler"]["filename"]
-log_path = f'./{log_file_base_name}_range_{datetime.datetime.utcnow().strftime("%Y%m%d%H%M")}.logs'
+log_path = f'./{log_file_base_name}_range_{datetime.datetime.utcnow().strftime("%Y%m%d%H")}.logs'
 logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_storategy.back_test")
 
-file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min30.csv'))
-date_column = "Time"
+file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_min30.csv'))
+date_column = "time"
+ohlc_columns = ["open", "high", "low", "close"]
 
 def RangeTrendCSV():
-    client = CSVClient(file=file_path, auto_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage", do_render=True)
-    rtp_p = RangeTrendProcess()
-    st1 = ts.storategies.RangeTrade(client, range_process=rtp_p, data_length=30, interval_mins=0, alpha=2, logger=logger)
-    manager = ts.ParallelStorategyManager([st1], minutes=60, logger=logger)
+    client = CSVClient(file=file_path, auto_step_index=True, start_index=0, logger=logger, auto_refresh_index=False, columns=ohlc_columns,date_column=date_column, slip_type="percentage", do_render=False)
+    rtp_p = RangeTrendProcess(slope_window=3)
+    st1 = ts.storategies.RangeTrade(client, range_process=rtp_p, data_length=30, interval_mins=0, alpha=2, slope_ratio=0.1, logger=logger)
+    manager = ts.ParallelStorategyManager([st1], minutes=10, logger=logger)
     manager.start_storategies()
 
-def RangeTrendMT5(frame):
-    client = MT5Client(id=100000000, password="", server="", frame=frame, auto_index=True, simulation=True)
+def RangeTrendMT5Simulation(frame):
+    client = MT5Client(id=100000000, password="", server="", frame=frame, simulation=True)
     columns = client.get_ohlc_columns()
     rtp_p = RangeTrendProcess()
-    st1 = ts.storategies.RangeTrade(client, range_process=rtp_p, data_length=30,interval_mins=0, logger=logger)
+    st1 = ts.storategies.RangeTrade(client, range_process=rtp_p, data_length=30,interval_mins=-1, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=1, logger=logger)
     manager.start_storategies()
     

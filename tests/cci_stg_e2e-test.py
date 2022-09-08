@@ -25,14 +25,14 @@ file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data_
 class Test(unittest.TestCase):
 
     def test_CCICrossCSV(self):
-        client = CSVClient(file=file_path, auto_index=True, start_index=7500, logger=logger)
+        client = CSVClient(file=file_path, auto_step_index=True, start_index=7500, logger=logger)
         cci_process = CCIProcess()
         st1 = ts.storategies.CCICross(client, cci_process, 0, logger=logger)
         manager = ts.ParallelStorategyManager([st1], minutes=5, logger=logger)
         manager.start_storategies()
     
     def test_CCIBoaderCSV(self):
-        client = CSVClient(file=file_path, auto_index=True, start_index=7500, logger=logger)
+        client = CSVClient(file=file_path, auto_step_index=True, start_index=7500, logger=logger)
         cci_process = CCIProcess()
         st1 = ts.storategies.CCIBoader(client, cci_process, 100,-100, 0, logger=logger)
         manager = ts.ParallelStorategyManager([st1], minutes=5, logger=logger)

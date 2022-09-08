@@ -30,7 +30,7 @@ ohlc_column = ["high", "open", "low", "close"]
 #ohlc_column = ["High", "Open", "Low", "Close"]
 
 def MACDRenkoTPByBBCSV():
-    client = CSVClient(file=file_path, frame=5, auto_index=True, start_index=0, logger=logger, columns=ohlc_column, date_column=date_column, slip_type="percentage")
+    client = CSVClient(file=file_path, frame=5, auto_step_index=True, start_index=0, logger=logger, columns=ohlc_column, date_column=date_column, slip_type="percentage")
     columns = client.get_ohlc_columns()
     macd_p = MACDpreProcess(short_window=8, long_window=18, signal_window=6, target_column=columns["Close"])
     renko_p = RenkoProcess(window=60, date_column=columns["Time"], ohlc_column=[columns["Open"], columns["High"], columns["Low"], columns["Close"]])

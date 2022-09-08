@@ -40,7 +40,7 @@
                 "propagate": false
             },
             "trade_storategy.back_test": {
-                "level": "DEBUG",
+                "level": "INFO",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
             }
