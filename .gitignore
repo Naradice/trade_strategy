@@ -16,4 +16,8 @@ __pycache__/
 /dist
 *trade_storategy*.logs
 tests/mt5*
+tests/env.test.json
+tests/cc_*
 trade/
+ts_venv/
+env.json

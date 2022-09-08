@@ -2,6 +2,7 @@ from trade_storategy.storategies.strategy_base import Storategy
 from trade_storategy.signal import *
 import finance_client as fc
 import json
+import pandas as pd
 
 class EMACross(Storategy):
     pass
@@ -13,9 +14,8 @@ class MACDCross(Storategy):
     
     key = "macd_cross"
     
-    def __get_macd_trend(self):
+    def __get_macd_trend(self, data: pd.DataFrame):
         #1:long, -1:short
-        data = self.client.get_rate_with_indicaters(self.data_length)
         if type(data) != type(None) and self.signal_column_name in data and len(data[self.signal_column_name]) == self.data_length:
                 signal = data[self.signal_column_name].iloc[-1]
                 macd = data[self.macd_column_name].iloc[-1]
@@ -57,8 +57,8 @@ class MACDCross(Storategy):
         self.current_trend, _ = self.__get_macd_trend()
         self.logger.info(f"initialized macd storategy: trend is {self.current_trend}")
             
-    def run(self, long_short = None):
-        tick_trend, price = self.__get_macd_trend()
+    def get_signal(self, data, long_short = None):
+        tick_trend, price = self.__get_macd_trend(data)
         signal = None
         if tick_trend != 0:
             if long_short != None:
@@ -112,11 +112,7 @@ class MACDRenko(Storategy):
         finance_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
 
             
-    def run(self, long_short: int = None, data_df = None):
-        if data_df is None:
-            df = self.client.get_rate_with_indicaters(self.data_length)
-        else:
-            df = data_df
+    def get_signal(self, df:pd.DataFrame, long_short: int = None):
         if long_short is None:
             long_short = self.trend#0 by default
         signal = None
@@ -188,9 +184,8 @@ class MACDRenkoSLByBB(MACDRenko):
         self.column_dict = self.client.get_ohlc_columns()
 
         
-    def run(self, long_short: int = None):
-        df = self.client.get_rate_with_indicaters(self.data_length)
-        signal = super().run(long_short, df)
+    def get_signal(self, df:pd.DataFrame, long_short: int = None):
+        signal = super().get_signal(df, long_short)
         
         if self.use_tp:
             positions = self.client.get_positions()
@@ -277,7 +272,7 @@ class CCICross(Storategy):
         Args:
             finance_client (fc.Client): any finance_client
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
-            interval_mins (int, optional): interval minutes to run this storategy. Defaults to 30.
+            interval_mins (int, optional): interval minutes to get_signal this storategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
@@ -309,10 +304,7 @@ class CCICross(Storategy):
             self.trend = -1
 
             
-    def run(self, long_short = None):
-        
-        df = self.client.get_rate_with_indicaters(self.data_length)
-        
+    def get_signal(self, df:pd.DataFrame, long_short = None):        
         if long_short == None:
             long_short = self.trend#0 by default
         signal = None
@@ -348,7 +340,7 @@ class CCIBoader(Storategy):
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             upper (int, option): upper value to raise Buy Signal. Defaults to 100
             lower (int, option): lower value to raise Sell Signal. Defaults to -100
-            interval_mins (int, optional): interval minutes to run this storategy. Defaults to 30.
+            interval_mins (int, optional): interval minutes to get_signal this storategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
@@ -389,9 +381,7 @@ class CCIBoader(Storategy):
             self.trend = 0
 
             
-    def run(self, long_short = None):
-        
-        df = self.client.get_rate_with_indicaters(self.data_length)
+    def get_signal(self, df:pd.DataFrame, long_short = None):
         
         if long_short == None:
             long_short = self.trend#0 by default
@@ -457,8 +447,7 @@ class RangeTrade(Storategy):
         self.alpha = alpha
         self.__tp_threrad = slope_ratio
         
-    def run(self):
-        df = self.client.get_rate_with_indicaters(self.data_length)
+    def get_signal(self, df:pd.DataFrame, long_short: int = None):
         rp = df[self.range_possibility_column].iloc[-1]
         tp = df[self.trend_possibility_column].iloc[-1]
         signal = None
@@ -546,11 +535,7 @@ class MACDRenkoRange(Storategy):
         finance_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
 
             
-    def run(self, long_short: int = None, data_df = None):
-        if data_df is None:
-            df = self.client.get_rate_with_indicaters(self.data_length)
-        else:
-            df = data_df
+    def get_signal(self, df:pd.DataFrame, long_short: int = None):
         if long_short is None:
             long_short = self.trend#0 by default
         signal = None
@@ -629,9 +614,8 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         self.column_dict = self.client.get_ohlc_columns()
 
         
-    def run(self, long_short: int = None):
-        df = self.client.get_rate_with_indicaters(self.data_length)
-        signal = super().run(long_short, df)
+    def get_signal(self, df:pd.DataFrame, long_short: int = None):
+        signal = super().get_signal(df, long_short)
         
         if self.use_tp:
             positions = self.client.get_positions()
