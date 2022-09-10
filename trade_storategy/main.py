@@ -106,7 +106,7 @@ class ParallelStorategyManager:
             resultTxt = f"{storategy.key}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
             self.logger.info(resultTxt)
             
-    def start_storategies(self):
+    def start_storategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
         self.__end_time = self.__start_time + self.__duration
         self.done = False
@@ -123,7 +123,7 @@ class ParallelStorategyManager:
             else:
                 t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
                 t.start()
-                while True:
+                if wait:
                     try:
                         ui = input("Please input 'exit' to end the storategies.")
                         if ui.lower() == 'exit':
