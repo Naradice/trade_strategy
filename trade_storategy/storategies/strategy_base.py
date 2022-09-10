@@ -43,6 +43,7 @@ class Storategy:
              
     
     def save_signal(self, signal, data):
+        #time, signal info, data
         pass
     
     def get_signal(self, df:pd.DataFrame, long_short: int = None):
@@ -63,4 +64,4 @@ class Storategy:
         if self.save_signal_info:
             self.save_signal(signal, df)
         
-        return ts.Signal(std_name="base")
+        return signal
