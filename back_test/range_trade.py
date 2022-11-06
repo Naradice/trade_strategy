@@ -33,7 +33,6 @@ def RangeTrendCSV():
 
 def RangeTrendMT5Simulation(frame):
     client = MT5Client(id=100000000, password="", server="", frame=frame, simulation=True)
-    columns = client.get_ohlc_columns()
     rtp_p = RangeTrendProcess()
     st1 = ts.storategies.RangeTrade(client, range_process=rtp_p, data_length=30,interval_mins=-1, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=1, logger=logger)

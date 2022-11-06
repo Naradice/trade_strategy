@@ -3,6 +3,7 @@ import trade_storategy as ts
 import pandas as pd
 from logging import getLogger, config
 import json, os
+from trade_storategy.signal import Signal
 
 class Storategy:
 
@@ -46,7 +47,7 @@ class Storategy:
         #time, signal info, data
         pass
     
-    def get_signal(self, df:pd.DataFrame, long_short: int = None):
+    def get_signal(self, df:pd.DataFrame, long_short: int = None) -> Signal:
         self.logger.debug("run base storategy for testing.")
         return None
     
