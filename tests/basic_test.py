@@ -14,13 +14,13 @@ class Test(unittest.TestCase):
     
     def test_storategy_base(self):
         client = Client()
-        ts.Storategy(client, 1)
+        ts.StorategyClient(client, 1)
         
     def test_parallel_timer(self):
         client = Client()
-        storategy1 = ts.Storategy(client, 1)
-        storategy2 = ts.Storategy(client, 2)
-        storategy3 = ts.Storategy(client, 3)
+        storategy1 = ts.StorategyClient(client, 1)
+        storategy2 = ts.StorategyClient(client, 2)
+        storategy3 = ts.StorategyClient(client, 3)
         sts = [storategy1, storategy2, storategy3]
         manager = ts.ParallelStorategyManager(sts, minutes=5)
         manager.start_storategies()

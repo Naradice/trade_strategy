@@ -8,6 +8,9 @@ class Trend:
     def __eq__(self, other):
         return other.id == self.id
     
+    def __str__(self) -> str:
+        return str(id)
+    
 class LongTrend(Trend):
     key = "long"
     id = 1
@@ -18,6 +21,7 @@ class ShortTrend(Trend):
     
 class Signal:
     key = "base"
+    trend = Trend()
     id = 0
     possibility = 0.0
     order_type = None
@@ -46,6 +50,7 @@ class Signal:
     
 class BuySignal(Signal):
     key = "buy"
+    trend = LongTrend()
     id = 1
     order_type = MarketOrderKey
     is_buy = True
@@ -61,6 +66,7 @@ class BuySignal(Signal):
 class SellSignal(Signal):
     key = "sell"
     id = -1
+    trend = ShortTrend()
     order_type = MarketOrderKey
     is_buy = False
     
@@ -74,6 +80,7 @@ class SellSignal(Signal):
         
 class BuyPendingOrderSignal(Signal):
     key = "buy_pending",
+    trend = LongTrend()
     id = 2
     order_type = PendingOrderKey
     is_buy = True
@@ -88,6 +95,7 @@ class BuyPendingOrderSignal(Signal):
 
 class SellPendingOrderSignal(Signal):
     key = "sell_order",
+    trend = ShortTrend()
     id = -2
     order_type = PendingOrderKey
     is_buy = False
@@ -103,6 +111,7 @@ class SellPendingOrderSignal(Signal):
 class CloseSignal(Signal):
     "signal to close all position"
     key = "close"
+    trend = Trend()
     id = 10
     order_type = MarketOrderKey
     is_buy = None
@@ -116,6 +125,7 @@ class CloseSignal(Signal):
 class CloseBuySignal(Signal):
     "signal to close short position"
     key = "close_buy"
+    trend = Trend()
     id = 11
     order_type = MarketOrderKey
     is_buy = True
@@ -132,6 +142,7 @@ class CloseBuySignal(Signal):
 class CloseSellSignal(Signal):
     "signal to close short position"
     key = "close_sell"
+    trend = Trend()
     id = -11
     order_type = MarketOrderKey
     is_buy = False
@@ -147,6 +158,7 @@ class CloseSellSignal(Signal):
 
 class ValueRangeSignal(Signal):
     key = "value_range",
+    trend = Trend()
     id = 100
     order_type = None
     is_buy = None

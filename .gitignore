@@ -13,6 +13,7 @@ trade_storategy.egg-info
 #IgnoreFolders
 .env
 __pycache__/
+/sandbox
 /dist
 *trade_storategy*.logs
 tests/mt5*

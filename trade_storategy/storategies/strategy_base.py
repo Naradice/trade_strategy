@@ -3,9 +3,9 @@ import trade_storategy as ts
 import pandas as pd
 from logging import getLogger, config
 import json, os
-from trade_storategy.signal import Signal
+from trade_storategy.signal import Signal, Trend
 
-class Storategy:
+class StorategyClient:
 
     key = "base"
     client: fc.Client = None
@@ -40,15 +40,18 @@ class Storategy:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins
-        self.trend = 0#0 don't have, 1 have long_position, -1 short_position
+        self.trend = Trend()#0 don't have, 1 have long_position, -1 short_position
              
-    
     def save_signal(self, signal, data):
         #time, signal info, data
         pass
     
-    def get_signal(self, df:pd.DataFrame, long_short: int = None) -> Signal:
-        self.logger.debug("run base storategy for testing.")
+    def update_trend(self, signal:ts.Signal):
+        if signal is not None:
+            self.trend = signal.trend
+    
+    def get_signal(self, df, long_short: int = None) -> Signal:
+        print("please overwrite this method on an actual client.")
         return None
     
     def run(self, long_short = None) -> ts.Signal:
@@ -60,8 +63,13 @@ class Storategy:
         Returns:
             ts.Signal: Signal of this strategy
         """
+        if long_short is None:
+            position = self.trend.id
+        else:
+            position = long_short
         df = self.client.get_rate_with_indicaters(self.data_length)
-        signal = self.get_signal(df, long_short)
+        signal = self.get_signal(df, position)
+        self.update_trend(signal)
         if self.save_signal_info:
             self.save_signal(signal, df)
         

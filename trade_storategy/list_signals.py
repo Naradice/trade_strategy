@@ -8,7 +8,7 @@ import copy
 
 class SystemTrade:
     
-    def __init__(self, clients:list, symbols:list, storategy:storategies.Storategy, data_length:int) -> None:
+    def __init__(self, clients:list, symbols:list, storategy:storategies.StorategyClient, data_length:int) -> None:
         self.clients = clients
         self.symbols = symbols
         self.st = storategy
@@ -41,7 +41,7 @@ class SystemTrade:
     
 class SystemTradeCSV(SystemTrade):
     
-    def __init__(self, file_paths: list, symbols:list, frame:int=60*24, storategy: storategies.Storategy = [], data_length: int = 100, idc_processes=[], ohlc_columns=["Open", "High", "Low", "Close"], date_column="Timestamp") -> None:
+    def __init__(self, file_paths: list, symbols:list, frame:int=60*24, storategy: storategies.StorategyClient = [], data_length: int = 100, idc_processes=[], ohlc_columns=["Open", "High", "Low", "Close"], date_column="Timestamp") -> None:
         
         clients = [CSVClient(file=path, columns=ohlc_columns, date_column=date_column, idc_processes=idc_processes) for path in file_paths]
         super().__init__(clients, symbols, storategy, data_length)
@@ -72,9 +72,9 @@ class SystemTradeCSV(SystemTrade):
             json.dump(signals, fp)
         return signals
             
-class SystemTradeYahoo(SystemTrade):
+class SystemTradeYahoo():
     
-    def __init__(self, symbols: list, frame, storategy: storategies.Storategy, data_length: int, idc_processes=[], adjust_close=True) -> None:
+    def __init__(self, symbols: list, frame, storategy: storategies.StorategyClient, data_length: int, idc_processes=[], adjust_close=True) -> None:
         self.symbols = symbols
         self.st = storategy
         self.data_length = data_length

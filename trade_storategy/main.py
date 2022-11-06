@@ -1,7 +1,7 @@
 import datetime
 import threading
 import time
-from trade_storategy.storategies import Storategy
+from trade_storategy.storategies import StorategyClient
 from logging import getLogger, config
 import json
 import os
@@ -38,7 +38,7 @@ class ParallelStorategyManager:
                 self.results[storategy.key] = []
         self.done = False
             
-    def __start_storategy(self, storategy: Storategy):
+    def __start_storategy(self, storategy: StorategyClient):
         interval_mins = storategy.interval_mins
         if interval_mins > 0:
             interval = interval_mins * 60
@@ -175,7 +175,7 @@ class MultiSymbolStorategyManager:
                 self.results[storategy.key] = []
         self.done = False
             
-    def __start_storategy(self, storategy: Storategy):
+    def __start_storategy(self, storategy: StorategyClient):
         interval_mins = storategy.interval_mins
         if interval_mins > 0:
             interval = interval_mins * 60
