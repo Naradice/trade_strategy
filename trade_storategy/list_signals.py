@@ -1,6 +1,5 @@
 import json
 from os import path
-from time import sleep
 from . import storategies
 from finance_client.csv.client import CSVClient
 from finance_client.yfinance.client import YahooClient
@@ -74,9 +73,9 @@ class SystemTradeCSV(SystemTrade):
             
 class SystemTradeYahoo():
     
-    def __init__(self, symbols: list, frame, storategy: storategies.StorategyClient, data_length: int, idc_processes=[], adjust_close=True) -> None:
+    def __init__(self, symbols: list, frame, storategy_key:str, data_length: int, idc_processes=[], adjust_close=True) -> None:
         self.symbols = symbols
-        self.st = storategy
+        self.st_key = storategy_key
         self.data_length = data_length
         self.adjust_close = adjust_close
         self.frame = frame
@@ -91,25 +90,24 @@ class SystemTradeYahoo():
         for symbol in self.symbols:
             idc_processes = copy.copy(self.idc_processes)
             client = YahooClient(symbol, adjust_close=self.adjust_close, frame=self.frame, idc_processes=idc_processes)
-            ohlc = client.data.iloc[-(self.data_length+30):]
-            ohlc = ohlc.dropna()
-            #print("----------------------------------")
-            #print(f"caliculation for {symbol}")
-            #print(ohlc)
-            df = client.run_processes(ohlc)
-            #print(df)
+            storategy = storategies.load_storategy_client(self.st_key, client, idc_processes, {"data_length":self.data_length + 30})
+            
+            has_history = False
             if symbol in signals:
                 state = int(signals[symbol]["state"])
+                has_history = True
             else:
                 state = 0
-            signal = self.st.get_signal(df, state)
+            signal = storategy.run(state)
             if signal is not None:
-                signals[symbol] = {"signal":signal.key, "price":signal.order_price, "state":state}
+                signals[symbol] = {"signal":signal.key, "price":signal.order_price, "state":state, "possibility": signal.possibility}
                 print(f"{symbol}: {signal}")
+            elif has_history:
+                if state == 0:
+                    print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
+                    signals.pop(symbol)
             del client
             del idc_processes
-            del ohlc
-            del df
         print("-----------------------------------------")
         print(signals)
         with open("./signals.json", mode="w") as fp:

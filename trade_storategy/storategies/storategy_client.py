@@ -29,6 +29,8 @@ class MACDCross(StorategyClient):
         required_process_keys = self.get_required_idc_param_keys()
         
         idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -89,8 +91,11 @@ class MACDRenko(StorategyClient):
     @classmethod
     def load(self, finance_client: fc.Client, idc_processes:list, options={}):
         required_process_keys = self.get_required_idc_param_keys()
-        
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -102,13 +107,25 @@ class MACDRenko(StorategyClient):
     def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
         super().__init__(finance_client, interval_mins, amount, data_length, logger)
         
-        if renko_process.kinds != "Renko":
-            if finance_client.have_process(fc.utils.RenkoProcess()) is False:
+        if renko_process is not None:
+            if renko_process.kinds != "Renko":
                 raise Exception("renko_process accept only RenkoProcess")
-            
-        if macd_process.kinds != "MACD":
-            if finance_client.have_process(fc.utils.MACDpreProcess()) is False:
+        else:
+            ohlc_dict = finance_client.get_ohlc_columns()
+            default_renko_process = fc.utils.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
+            # check if same key exists
+            if finance_client.have_process(default_renko_process) is False:
+                renko_process = default_renko_process
+                self.logger.info("Default Renko Process is added. If you want to specify different window, please assign renko_process.")
+        if macd_process is not None:
+            if macd_process.kinds != "MACD":
                 raise Exception("macd_process accept only MACDProcess")
+        else:
+            ohlc_dict = finance_client.get_ohlc_columns()
+            default_macd_process = fc.utils.MACDpreProcess(target_column=ohlc_dict["Close"])
+            if finance_client.have_process(default_macd_process) is False:
+                macd_process = default_macd_process
+                self.logger.info("Default MACD Process is added. If you want to specify different window, please assign macd_process.")
         self.macd_column_column = macd_process.columns["MACD"]
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
@@ -123,6 +140,7 @@ class MACDRenko(StorategyClient):
         self.slope_macd_column = macd_slope.columns["Slope"]
         self.slope_signal_column = signal_slope.columns["Slope"]
         
+        #when same key of process is already added, the process is ignored
         finance_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
 
     def get_signal(self, df:pd.DataFrame, position):
@@ -150,7 +168,9 @@ class MACDRenkoSLByBB(MACDRenko):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -208,7 +228,9 @@ class CCICross(StorategyClient):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -273,7 +295,9 @@ class CCIBoader(StorategyClient):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -348,7 +372,9 @@ class RangeTrade(StorategyClient):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -407,7 +433,9 @@ class MACDRenkoRange(StorategyClient):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
@@ -489,7 +517,9 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
     def load(self, finance_client, idc_processes=[], options={}):
         required_process_keys = self.get_required_idc_param_keys()
         
-        idc_options = {}        
+        idc_options = {}
+        for key, item in required_process_keys.items():
+            idc_options[item] = None 
         for process in idc_processes:
             if process.kinds in required_process_keys:
                 param_key = required_process_keys[process.kinds]
