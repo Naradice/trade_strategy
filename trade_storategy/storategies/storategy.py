@@ -39,18 +39,19 @@ def macd_renko(position, df:pd.DataFrame, renko_bnum_column, macd_column_column,
     signal = None
     if len(df) > 0:
         last_df = df.iloc[-1]
+        renko_cons_num = df[renko_bnum_column].iloc[-2:].sum()
         if long_short == 0:
-            if last_df[renko_bnum_column]>=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
+            if renko_cons_num >= 2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
                 signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-            elif last_df[renko_bnum_column]<=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
+            elif renko_cons_num <= -2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
                 signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
         elif long_short == 1:
-            if last_df[renko_bnum_column]<=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
+            if renko_cons_num <= -2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
                 signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
                 signal = CloseSignal(std_name=key)
         elif long_short == -1:
-            if last_df[renko_bnum_column]>=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
+            if renko_cons_num >= 1 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
                 signal = CloseBuySignal(std_name=key,  price=df[order_price_column].iloc[-1])
             elif last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
                 signal = CloseSignal(std_name=key)
@@ -212,8 +213,9 @@ def macd_renko_range_ex(position, df:pd.DataFrame, is_in_range,
     if len(df) > 0:
         rp = df[range_possibility_column].iloc[-1]
         last_df = df.iloc[-1]
+        renko_cont_num = df[renko_bnum_column].iloc[-2:].sum()
         if long_short == 0:
-            if last_df[renko_bnum_column]>=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
+            if renko_cont_num >=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
                 if rp <= 0.65:
                     signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
                     trend = 1
@@ -222,7 +224,7 @@ def macd_renko_range_ex(position, df:pd.DataFrame, is_in_range,
                     __is_in_range = True
                     signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
                     trend = -1
-            elif last_df[renko_bnum_column]<=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
+            elif renko_cont_num <=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
                 if rp <= 0.65:
                     signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
                     trend = -1
@@ -237,7 +239,7 @@ def macd_renko_range_ex(position, df:pd.DataFrame, is_in_range,
                 if last_df[high_column] >= last_df[upper_column]:
                         signal = CloseSignal(std_name=key)
             else:
-                if last_df[renko_bnum_column]<=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
+                if renko_cont_num <=-2 and last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
                     signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
                     trend = -1
                 elif last_df[macd_column_column]<last_df[macd_signal_column] and last_df[slope_macd_column]<last_df[slope_signal_column]:
@@ -251,7 +253,7 @@ def macd_renko_range_ex(position, df:pd.DataFrame, is_in_range,
                 if last_df[low_column] <= last_df[lower_column]:
                         signal = CloseSignal(std_name=key)
             else:
-                if last_df[renko_bnum_column]>=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
+                if renko_cont_num >=2 and last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
                     signal = CloseBuySignal(std_name=key,  price=df[order_price_column].iloc[-1])
                     trend = 1
                 elif last_df[macd_column_column]>last_df[macd_signal_column] and last_df[slope_macd_column]>last_df[slope_signal_column]:
