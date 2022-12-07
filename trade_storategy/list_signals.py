@@ -89,8 +89,9 @@ class SystemTradeYahoo():
             signals = {}
         for symbol in self.symbols:
             idc_processes = copy.copy(self.idc_processes)
-            client = YahooClient(symbol, adjust_close=self.adjust_close, frame=self.frame, idc_processes=idc_processes)
-            storategy = storategies.load_storategy_client(self.st_key, client, idc_processes, {"data_length":self.data_length + 30})
+            data_length = self.data_length + 30
+            client = YahooClient(symbol, adjust_close=self.adjust_close, frame=self.frame, start_index=data_length)
+            storategy = storategies.load_storategy_client(self.st_key, client, idc_processes, {"data_length":data_length})
             
             has_history = False
             if symbol in signals:

@@ -20,17 +20,38 @@ logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_storategy.test")
 
-file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min5.csv'))
-date_column = "Time"
+base_path = os.path.dirname(__file__)
+date_column = "Datetime"
+symbols = ['1333.T', '1332.T', '1605.T']
+file_paths = [f'L:/data/yfinance/yfinance_{symbol}_D1.csv' for symbol in symbols]
 
 class Test(unittest.TestCase):
-    
-    def test_MACDWidthCSV(self):
-        client = CSVClient(file=file_path, auto_step_index=True, start_index=0, logger=logger, date_column=date_column, slip_type="percentage", do_render=True)
-        macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9)
-        renko_p = RenkoProcess(window=60, date_column=date_column)
-        st1 = ts.storategies.MACDRenko(client, interval_mins=0, renko_process=renko_p, macd_process=macd_p,data_length=120, slope_window=18, logger=logger)
-        manager = ts.ParallelStorategyManager([st1], minutes=30, logger=logger)
+        
+    def test_MACDWidthCSV1D(self):
+        frame = 60*24
+        ohlc_columns = ["Open", "High", "Low", "Close"]
+
+        client = CSVClient(files=file_paths[0], auto_step_index=True, frame=frame, start_index=130, logger=logger, columns=ohlc_columns ,date_column=date_column, slip_type="percentage", do_render=False)
+        columns = client.get_ohlc_columns()
+        macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
+        renko_p = RenkoProcess(window=60)
+        rtp_p = RangeTrendProcess(slope_window=3)
+        bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
+        st1 = ts.storategies.MACDRenkoRangeSLByBB(client, renko_p, macd_p, bband_process, rtp_p, slope_window=5, interval_mins = 0, data_length=70, logger=logger)
+        manager = ts.ParallelStorategyManager([st1], minutes=1, logger=logger)
+        manager.start_storategies()
+        
+    def test_MACDWidthCSV1DSymbols(self):
+        stgs = []
+        frame = 60*24
+        ohlc_columns = ["Open", "High", "Low", "Close"]
+        for path in file_paths:
+            client = CSVClient(files=path, auto_step_index=True,frame=frame, start_index=60, logger=logger, columns=ohlc_columns, date_column=date_column, slip_type="percentage")
+            macd_p = MACDProcess(short_window=6, long_window=13, signal_window=5, target_column=ohlc_columns[3])
+            renko_p = RenkoProcess(window=30)
+            st = ts.storategies.MACDRenko(client, renko_p, macd_p, slope_window = 3, interval_mins = 0, data_length=30, logger=logger)
+            stgs.append(st)
+        manager = ts.MultiSymbolStorategyManager(stgs, minutes=3, logger=logger)
         manager.start_storategies()
             
 if __name__ == '__main__':

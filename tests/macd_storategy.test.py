@@ -10,14 +10,14 @@ module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(module_path)
 import trade_storategy as ts
 
-csv_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data_source/bitcoin_5_2017T0710-2021T103022.csv'))
+csv_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'L:/data/csv/bitcoin_5_2017T0710-2021T103022.csv'))
 
 class Test(unittest.TestCase):
     
     def test_create_order(self):
-        client = CSVClient(file=csv_file)
+        client = CSVClient(files=csv_file, date_column="Timestamp", start_index=100)
         st1 = ts.storategies.MACDCross(client)
-        st1.create_signal()
+        st1.get_signal(client.get_ohlc(100), 0)
     
 if __name__ == '__main__':
     unittest.main()

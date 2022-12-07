@@ -21,7 +21,7 @@ class MACDCross(StorategyClient):
     def get_required_idc_param_keys(self):
         MACDProcessParamKey = "macd_process"
         return {
-            fc.utils.MACDpreProcess.kinds: MACDProcessParamKey
+            fc.utils.MACDProcess.kinds: MACDProcessParamKey
         }
     
     @classmethod
@@ -48,16 +48,14 @@ class MACDCross(StorategyClient):
             data_length (int, optional): length to caliculate the MACD. Defaults to 100.
             macd_process (Process, optional): You can specify specific parameter of MACD Process. Defaults to None.
         """
-        super().__init__(finance_client, interval_mins, data_length, logger)
-        if macd_process == None:
-            macd = fc.utils.MACDpreProcess()
+        super().__init__(finance_client, [], interval_mins, data_length, logger)
+        if macd_process is None:
+            macd = fc.utils.MACDProcess()
         else:
             if macd.kinds == "MACD":
                 macd = macd_process
             else:
                 raise Exception("MACDCross accept only MACDProcess")
-        if finance_client.have_process(macd) == False:
-            finance_client.add_indicater(macd)
             
         self.macd_column_name = macd.columns["MACD"]
         self.signal_column_name = macd.columns["Signal"]
@@ -67,6 +65,7 @@ class MACDCross(StorategyClient):
         else:
             self.close_column_name = "Close"
         self.current_trend = 0
+        self.add_indicaters([macd])
             
     def get_signal(self, data, position):
         signal, tick_trend = storategy.macd_cross(position, self.current_trend,data, self.close_column_name, self.signal_column_name,
@@ -85,15 +84,13 @@ class MACDRenko(StorategyClient):
         MACDProcessParamKey = "macd_process"
         return {
             fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
-            fc.utils.MACDpreProcess.kinds: MACDProcessParamKey
+            fc.utils.MACDProcess.kinds: MACDProcessParamKey
         }
     
     @classmethod
     def load(self, finance_client: fc.Client, idc_processes:list, options={}):
         required_process_keys = self.get_required_idc_param_keys()
         idc_options = {}
-        for key, item in required_process_keys.items():
-            idc_options[item] = None
         for key, item in required_process_keys.items():
             idc_options[item] = None
         for process in idc_processes:
@@ -104,28 +101,21 @@ class MACDRenko(StorategyClient):
         return MACDRenko(finance_client=finance_client, **options)
         
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
-        super().__init__(finance_client, interval_mins, amount, data_length, logger)
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
+        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process is not None:
             if renko_process.kinds != "Renko":
                 raise Exception("renko_process accept only RenkoProcess")
         else:
             ohlc_dict = finance_client.get_ohlc_columns()
-            default_renko_process = fc.utils.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
-            # check if same key exists
-            if finance_client.have_process(default_renko_process) is False:
-                renko_process = default_renko_process
-                self.logger.info("Default Renko Process is added. If you want to specify different window, please assign renko_process.")
+            renko_process = fc.utils.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
         if macd_process is not None:
             if macd_process.kinds != "MACD":
                 raise Exception("macd_process accept only MACDProcess")
         else:
             ohlc_dict = finance_client.get_ohlc_columns()
-            default_macd_process = fc.utils.MACDpreProcess(target_column=ohlc_dict["Close"])
-            if finance_client.have_process(default_macd_process) is False:
-                macd_process = default_macd_process
-                self.logger.info("Default MACD Process is added. If you want to specify different window, please assign macd_process.")
+            macd_process = fc.utils.MACDProcess(target_column=ohlc_dict["Close"])
         self.macd_column_column = macd_process.columns["MACD"]
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
@@ -141,7 +131,8 @@ class MACDRenko(StorategyClient):
         self.slope_signal_column = signal_slope.columns["Slope"]
         
         #when same key of process is already added, the process is ignored
-        finance_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
+        indicaters = [renko_process, macd_process, macd_slope, signal_slope]
+        self.add_indicaters(indicaters)
 
     def get_signal(self, df:pd.DataFrame, position):
         signal = storategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
@@ -159,8 +150,8 @@ class MACDRenkoSLByBB(MACDRenko):
         BBANDProcessParamKey = "bolinger_process"
         return {
             fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
-            fc.utils.MACDpreProcess.kinds: MACDProcessParamKey,
-            fc.utils.BBANDpreProcess.kinds: BBANDProcessParamKey
+            fc.utils.MACDProcess.kinds: MACDProcessParamKey,
+            fc.utils.BBANDProcess.kinds: BBANDProcessParamKey
         }
         
     
@@ -178,7 +169,7 @@ class MACDRenkoSLByBB(MACDRenko):
         options.update(idc_options)
         return MACDRenkoRangeSLByBB(finance_client, **options)
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, bolinger_process:fc.utils.BBANDpreProcess, slope_window = 5, amount=1, use_tp= False, continuous=False, interval_mins: int = -1, data_length=250, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, bolinger_process:fc.utils.BBANDProcess, slope_window = 5, amount=1, use_tp= False, continuous=False, interval_mins: int = -1, data_length=250, logger=None) -> None:
         """
         add condition to open a position by Bolinger Band
         
@@ -201,7 +192,6 @@ class MACDRenkoSLByBB(MACDRenko):
         self.b_option = bolinger_process.option
         self.b_alpha = self.b_option["alpha"]
         ## add BBANDPreProcess
-        self.client.add_indicater(bolinger_process)
         self.use_tp = use_tp
         self.column_dict = self.client.get_ohlc_columns()
 
@@ -251,14 +241,12 @@ class CCICross(StorategyClient):
         Raises:
             Exception: when other than CCI process is provided.
         """
-        super().__init__(finance_client, interval_mins, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, data_length, logger)
         if cci_process == None:
             cci_process = fc.utils.CCIProcess()
         else:
             if cci_process.kinds != "CCI":
                 raise Exception("CCICross accept only CCIProcess")
-        if finance_client.have_process(cci_process) == False:
-            finance_client.add_indicater(cci_process)
             
         self.cci_column_name = cci_process.columns["CCI"]
         column_dict = self.client.get_ohlc_columns()
@@ -267,14 +255,15 @@ class CCICross(StorategyClient):
         else:
             self.close_column_name = "Close"
         self.logger.info(f"initialized cci storategy")
-        df = self.client.get_rate_with_indicaters(self.data_length)
+        indicaters = [cci_process]
+        df = self.client.get_ohlc(self.data_length, idc_processes=indicaters)
         last_df = df.iloc[-1]
         current_cci = last_df[self.cci_column_name]
         if current_cci > 0:
             self.trend = LongTrend()
         else:
             self.trend = ShortTrend()
-
+        self.add_indicaters(indicaters)
             
     def get_signal(self, df:pd.DataFrame, position=None):
         signal = storategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
@@ -321,7 +310,7 @@ class CCIBoader(StorategyClient):
             Exception: when other than CCI process is provided.
             ValueException: when lower >= upper
         """
-        super().__init__(finance_client, interval_mins, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, data_length, logger)
         if lower >= upper:
             raise ValueError("lower should be lower than upper")
         else:
@@ -333,8 +322,6 @@ class CCIBoader(StorategyClient):
         else:
             if cci_process.kinds != "CCI":
                 raise Exception("CCICross accept only CCIProcess")
-        if finance_client.have_process(cci_process) == False:
-            finance_client.add_indicater(cci_process)
             
         self.cci_column_name = cci_process.columns["CCI"]
         column_dict = self.client.get_ohlc_columns()
@@ -343,7 +330,8 @@ class CCIBoader(StorategyClient):
         else:
             self.close_column_name = "Close"
         self.logger.info(f"initialized cci storategy")
-        df = self.client.get_rate_with_indicaters(self.data_length)
+        indicaters = [cci_process]
+        df = self.client.get_ohlc(self.data_length, idc_processes=indicaters)
         last_df = df.iloc[-1]
         current_cci = last_df[self.cci_column_name]
         if current_cci >= upper:
@@ -352,6 +340,7 @@ class CCIBoader(StorategyClient):
             self.trend = ShortTrend()
         else:
             self.trend = Trend()
+        self.add_indicaters(indicaters)
             
     def get_signal(self, df:pd.DataFrame, position):
         signal = storategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)        
@@ -383,22 +372,19 @@ class RangeTrade(StorategyClient):
         return CCICross(finance_client, **options)
     
     def __init__(self, finance_client: fc.Client, range_process=None, alpha=1, slope_ratio=0.4, interval_mins: int = -1, amount=1, data_length: int = 100, logger=None) -> None:
-        super().__init__(finance_client, interval_mins, amount, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         ohlc_columns = finance_client.get_ohlc_columns()
         self.close_column = ohlc_columns["Close"]
         self.high_column = ohlc_columns["High"]
         self.low_column = ohlc_columns["Low"]
         if range_process is None:
             range_process = fc.utils.RangeTrendProcess()
-        bband_process = fc.utils.BBANDpreProcess(target_column=self.close_column, alpha=alpha)
-        if finance_client.have_process(bband_process) is False:
-            finance_client.add_indicater(bband_process)
-        if finance_client.have_process(range_process) is False:
-            finance_client.add_indicater(range_process)
+        bband_process = fc.utils.BBANDProcess(target_column=self.close_column, alpha=alpha)
+        indicaters = [bband_process, range_process]
         ##initialize params of range indicater
         temp = finance_client.do_render
         finance_client.do_render = False
-        finance_client.get_rate_with_indicaters()
+        finance_client.get_ohlc(idc_processes=indicaters)
         finance_client.do_render = temp
         self.trend_possibility_column = range_process.columns["trend"]
         self.range_possibility_column = range_process.columns["range"]
@@ -408,6 +394,7 @@ class RangeTrade(StorategyClient):
         self.MV_column = bband_process.columns["MV"]
         self.alpha = alpha
         self.__tp_threrad = slope_ratio
+        self.add_indicaters(indicaters)
         
     def get_signal(self, df:pd.DataFrame, position):
         signal = storategy.range_experimental(position, df, self.range_possibility_column, self.trend_possibility_column,
@@ -426,7 +413,7 @@ class MACDRenkoRange(StorategyClient):
         return {
             fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
             fc.utils.RangeTrendProcess.kinds: RangeProcessParamKey,
-            fc.utils.MACDpreProcess.kinds: MACDProcessParamKey
+            fc.utils.MACDProcess.kinds: MACDProcessParamKey
         }
     
     @classmethod
@@ -443,16 +430,15 @@ class MACDRenkoRange(StorategyClient):
         options.update(idc_options)
         return MACDRenkoRange(finance_client, **options)
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, range_process: fc.utils.RangeTrendProcess, slope_window = 5, alpha=2, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
-        super().__init__(finance_client, interval_mins, amount, data_length, logger)
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, range_process: fc.utils.RangeTrendProcess, slope_window = 5, alpha=2, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
+        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process.kinds != "Renko":
-            if finance_client.have_process(fc.utils.RenkoProcess()) is False:
-                raise Exception("renko_process accept only RenkoProcess")
+            raise Exception("renko_process accept only RenkoProcess")
             
         if macd_process.kinds != "MACD":
-            if finance_client.have_process(fc.utils.MACDpreProcess()) is False:
-                raise Exception("macd_process accept only MACDProcess")
+            raise Exception("macd_process accept only MACDProcess")
+        
         column_dict = self.client.get_ohlc_columns()
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
@@ -467,12 +453,8 @@ class MACDRenkoRange(StorategyClient):
 
         if range_process is None or range_process.kinds != fc.utils.RangeTrendProcess.kinds:
             range_process = fc.utils.RangeTrendProcess()
-        bband_process = fc.utils.BBANDpreProcess(target_column=self.close_column_name, alpha=alpha)
+        bband_process = fc.utils.BBANDProcess(target_column=self.close_column_name, alpha=alpha)
         self.alpha = alpha
-        if finance_client.have_process(bband_process) is False:
-            finance_client.add_indicater(bband_process)
-        if finance_client.have_process(range_process) is False:
-            finance_client.add_indicater(range_process)
         self.macd_column_column = macd_process.columns["MACD"]
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
@@ -486,7 +468,7 @@ class MACDRenkoRange(StorategyClient):
         self.Width_column = bband_process.columns["Width"]
         self.BHigh_column = bband_process.columns["UV"]
         self.BLow_column = bband_process.columns["LV"]
-        finance_client.add_indicaters([renko_process, macd_process, macd_slope, signal_slope])
+        self.add_indicaters([renko_process, bband_process, macd_process, macd_slope, signal_slope, range_process])
 
             
     def get_signal(self, df:pd.DataFrame, position):
@@ -509,8 +491,8 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         return {
             fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
             fc.utils.RangeTrendProcess.kinds: RangeProcessParamKey,
-            fc.utils.MACDpreProcess.kinds: MACDProcessParamKey,
-            fc.utils.BBANDpreProcess.kinds: BBANDProcessParamKey
+            fc.utils.MACDProcess.kinds: MACDProcessParamKey,
+            fc.utils.BBANDProcess.kinds: BBANDProcessParamKey
         }
     
     @classmethod
@@ -527,7 +509,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         options.update(idc_options)
         return MACDRenkoRangeSLByBB(finance_client, **options)
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDpreProcess, bolinger_process:fc.utils.BBANDpreProcess, range_process=None, slope_window = 5, amount=1, use_tp= False, interval_mins: int = -1, data_length=250, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, bolinger_process:fc.utils.BBANDProcess, range_process=None, slope_window = 5, amount=1, use_tp= False, interval_mins: int = -1, data_length=250, logger=None) -> None:
         """
         add condition to open a position by Bolinger Band
         
@@ -553,7 +535,6 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         ##check if bolinger_process is an instannce of BBANDpreProcess
         super().__init__(finance_client, renko_process, macd_process, range_process, slope_window, self.b_alpha, amount, interval_mins, data_length, logger)
 
-        self.client.add_indicater(bolinger_process)
         self.use_tp = use_tp
         self.column_dict = self.client.get_ohlc_columns()
         self.__is_in_range = False
