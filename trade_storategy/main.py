@@ -80,13 +80,13 @@ class ParallelStorategyManager:
                             if result:
                                 self.logger.info(f"closed result: {result}")
                                 self.results[storategy.key].append(result[2])
-
-                if signal.is_buy:
-                    position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
-                    self.logger.info(f"long position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
-                elif signal.is_buy == False:
-                    position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
-                    self.logger.info(f"short position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                else:
+                    if signal.is_buy:
+                        position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
+                        self.logger.info(f"long position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                    elif signal.is_buy == False:
+                        position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
+                        self.logger.info(f"short position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
             if doSleep:
                 base_time = time.time()
                 next_time = ((base_time - time.time()) % interval) or interval
