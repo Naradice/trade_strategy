@@ -28,18 +28,18 @@ date_column = "time"
 ohlc_columns = ["open", "high", "low", "close"]
 
 def MACDRenkoByBBCSV():
-    client = CSVClient(file=file_path, auto_step_index=True,frame=frame, start_index=0, logger=logger, columns=ohlc_columns, date_column=date_column, slip_type="percentage")
+    client = CSVClient(file=file_path, auto_step_index=True,frame=frame, start_index=0, logger=logger, columns=ohlc_columns, date_column=date_column, slip_type="percent")
     columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
+    macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
     st1 = ts.storategies.MACDRenko(client, renko_p, macd_p, slope_window = 5, interval_mins = 0, data_length=120, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=30, logger=logger)
     manager.start_storategies()
 
 def MACDRenkoRangeCSV():
-    client = CSVClient(file=file_path, auto_step_index=True, frame=frame, start_index=0, logger=logger, columns=ohlc_columns ,date_column=date_column, slip_type="percentage", auto_refresh_index=False, do_render=False)
+    client = CSVClient(file=file_path, auto_step_index=True, frame=frame, start_index=0, logger=logger, columns=ohlc_columns ,date_column=date_column, slip_type="percent", auto_refresh_index=False, do_render=False)
     columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
+    macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
     rtp_p = RangeTrendProcess(slope_window=3)
     st1 = ts.storategies.MACDRenkoRange(client, renko_p, macd_p, rtp_p, slope_window = 5, interval_mins = 0, data_length=100, logger=logger)
@@ -47,12 +47,12 @@ def MACDRenkoRangeCSV():
     manager.start_storategies()
     
 def MACDRenkoRangeSLCSV(slope_window=5):
-    client = CSVClient(file=file_path, auto_step_index=True, frame=frame, start_index=0, logger=logger, columns=ohlc_columns ,date_column=date_column, slip_type="percentage", auto_refresh_index=False, do_render=False)
+    client = CSVClient(file=file_path, auto_step_index=True, frame=frame, start_index=0, logger=logger, columns=ohlc_columns ,date_column=date_column, slip_type="percent", auto_refresh_index=False, do_render=False)
     columns = client.get_ohlc_columns()
-    macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
+    macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
     rtp_p = RangeTrendProcess(slope_window=3)
-    bband_process = BBANDpreProcess(target_column=columns["Close"], alpha=2)
+    bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
     st1 = ts.storategies.MACDRenkoRangeSLByBB(client, renko_p, macd_p, bband_process, rtp_p, slope_window=slope_window, interval_mins = 0, data_length=70, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=60*3, logger=logger)
     manager.start_storategies()
@@ -61,7 +61,7 @@ def MACDRenkoMT5(frame, short_window, long_window, signal_window, renko_window, 
     client = MT5Client(id=100000000, password="", server="", frame=frame, auto_step_index=True, simulation=True)
     columns = client.get_ohlc_columns()
     data_length = max([short_window, long_window, signal_window, renko_window, slope_window])
-    macd_p = MACDpreProcess(short_window=short_window, long_window=long_window, signal_window=signal_window, target_column=columns["Close"])
+    macd_p = MACDProcess(short_window=short_window, long_window=long_window, signal_window=signal_window, target_column=columns["Close"])
     renko_p = RenkoProcess(window=renko_window,ohlc_column=[columns["Open"], columns["High"], columns["Low"], columns["Close"]])
     st1 = ts.storategies.MACDRenko(client, renko_p, macd_p, slope_window = slope_window, interval_mins = 0, data_length=10, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=10, logger=logger)
@@ -71,7 +71,7 @@ def MACDRenkoMT5(frame, short_window, long_window, signal_window, renko_window, 
     client = MT5Client(id=100000000, password="", server="", frame=frame, auto_step_index=True, simulation=True)
     columns = client.get_ohlc_columns()
     data_length = max([short_window, long_window, signal_window, renko_window, slope_window])
-    macd_p = MACDpreProcess(short_window=short_window, long_window=long_window, signal_window=signal_window, target_column=columns["Close"])
+    macd_p = MACDProcess(short_window=short_window, long_window=long_window, signal_window=signal_window, target_column=columns["Close"])
     renko_p = RenkoProcess(window=renko_window, ohlc_column=[columns["Open"], columns["High"], columns["Low"], columns["Close"]])
     st1 = ts.storategies.MACDRenko(client, renko_p, macd_p, slope_window = slope_window, interval_mins = 0, data_length=10, logger=logger)
     manager = ts.ParallelStorategyManager([st1], minutes=10, logger=logger)
