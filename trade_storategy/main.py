@@ -134,13 +134,13 @@ class ParallelStorategyManager:
                         if ui.lower() == 'exit':
                             self.event.set()
                             self.done = True
-                            if t.isAlive():
+                            if t.is_alive():
                                 exit()
                     except KeyboardInterrupt:
                         self.logger.info("Finish the storategies as KeyboardInterrupt happened")
                         self.event.set()
                         self.done = True
-                        if t.isAlive():
+                        if t.is_alive():
                             exit()
                 
         
