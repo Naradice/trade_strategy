@@ -22,9 +22,9 @@ logger = getLogger("trade_storategy.test")
 
 class Test(unittest.TestCase):
     def test_MACDWidthCSV(self):
-        client = CSVClient(file='../../data_source/bitcoin_5_2017T0710-2021T103022.csv', auto_step_index=True, start_index=7500, logger=logger)
+        client = CSVClient(files='L:/data/csv/bitcoin_5_2017T0710-2021T103022.csv', auto_step_index=True, start_index=750, logger=logger)
         st1 = ts.storategies.MACDCross(client, 0.1, logger=logger)
-        manager = ts.ParallelStorategyManager([st1], minutes=30, logger=logger)
+        manager = ts.ParallelStorategyManager([st1], minutes=3, logger=logger)
         manager.start_storategies()
         
 if __name__ == '__main__':
