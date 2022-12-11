@@ -61,7 +61,7 @@ class StorategyClient:
         print("please overwrite this method on an actual client.")
         return None
     
-    def run(self, long_short = None, symbols:list=[]) -> ts.Signal:
+    def run(self, symbol:str, long_short = None) -> ts.Signal:
         """ run this storategy
 
         Args:
@@ -74,10 +74,11 @@ class StorategyClient:
             position = self.trend.id
         else:
             position = long_short
-        df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
-        signal = self.get_signal(df, position, symbols)
+        df = self.client.get_ohlc(self.data_length, [symbol], idc_processes=self.__idc_processes)
+        signal = self.get_signal(df, position, symbol)
         if signal is not None:
             signal.amount = self.amount
+            signal.symbol = symbol
             self.update_trend(signal)
         if self.save_signal_info:
             self.save_signal(signal, df)

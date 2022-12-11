@@ -55,10 +55,11 @@ class ParallelStorategyManager:
             if sleep_time > 0:
                 self.logger.debug(f"wait {sleep_time} to start on frame time")
                 time.sleep(sleep_time)
-                
+        
+        count = 0
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
-            signal = storategy.run()
+            signal = storategy.run(storategy.client.symbols[0])
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
@@ -82,10 +83,10 @@ class ParallelStorategyManager:
                                 self.results[storategy.key].append(result[2])
                 else:
                     if signal.is_buy:
-                        position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
+                        position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
                         self.logger.info(f"long position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
                     elif signal.is_buy == False:
-                        position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol="USDJPY")
+                        position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
                         self.logger.info(f"short position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
             if doSleep:
                 base_time = time.time()
@@ -96,6 +97,9 @@ class ParallelStorategyManager:
                     self.logger.info("Close all positions as for ending the storategies.")
                     storategy.client.close_all_positions()
                     break
+            if count % 10 == 0:
+                self.logger.debug(f"{count+1} times caliculated.")
+            count+=1
         
         totalSignalCount = len(self.results[storategy.key])
         if totalSignalCount != 0:
@@ -123,6 +127,7 @@ class ParallelStorategyManager:
             else:
                 t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
                 t.start()
+                self.logger.debug("started storategy")
                 if wait:
                     try:
                         ui = input("Please input 'exit' to end the storategies.")
@@ -195,6 +200,7 @@ class MultiSymbolStorategyManager:
             if sleep_time > 0:
                 self.logger.debug(f"wait {sleep_time} to start on frame time")
                 time.sleep(sleep_time)
+
         count = 0
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
