@@ -34,6 +34,7 @@ class Signal:
     option_info = None
     order_price = None
     amount = 0
+    symbol = None
     
     def __init__(self, std_name) -> None:
         self.std_name = std_name
@@ -46,7 +47,7 @@ class Signal:
         return False
     
     def __str__(self) -> str:
-        return f"(key={self.key}, order_type={self.order_type}, possibility:{self.possibility}, is_close:{self.is_close}, is_buy:{self.is_buy}, order_price:{self.order_price}, tp: {self.tp}, sl:{self.sl}, dev:{self.dev})"
+        return f"(key={self.key}, symbol={self.symbol}, order_type={self.order_type}, possibility:{self.possibility}, is_close:{self.is_close}, is_buy:{self.is_buy}, order_price:{self.order_price}, tp: {self.tp}, sl:{self.sl}, dev:{self.dev})"
     
 class BuySignal(Signal):
     key = "buy"

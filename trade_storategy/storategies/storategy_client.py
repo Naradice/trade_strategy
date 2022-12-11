@@ -67,7 +67,7 @@ class MACDCross(StorategyClient):
         self.current_trend = 0
         self.add_indicaters([macd])
             
-    def get_signal(self, data, position, symbols=[]):
+    def get_signal(self, data, position, symbol:str):
         signal, tick_trend = storategy.macd_cross(position, self.current_trend,data, self.close_column_name, self.signal_column_name,
                              self.macd_column_name)
         #save trend of macd
@@ -101,7 +101,7 @@ class MACDRenko(StorategyClient):
         return MACDRenko(finance_client=finance_client, **options)
         
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, trend_threshhold=2, logger=None) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process is not None:
@@ -120,6 +120,7 @@ class MACDRenko(StorategyClient):
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
         column_dict = self.client.get_ohlc_columns()
+        self.trend_threshhold = trend_threshhold
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
         else:
@@ -134,9 +135,9 @@ class MACDRenko(StorategyClient):
         indicaters = [renko_process, macd_process, macd_slope, signal_slope]
         self.add_indicaters(indicaters)
 
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal = storategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
-                             self.slope_signal_column, self.close_column_name)
+                             self.slope_signal_column, self.close_column_name, trend_threshhold=self.trend_threshhold)
         return signal
     
 class MACDRenkoSLByBB(MACDRenko):
@@ -195,9 +196,9 @@ class MACDRenkoSLByBB(MACDRenko):
         self.use_tp = use_tp
         self.column_dict = self.client.get_ohlc_columns()
 
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
-        ask_value = self.client.get_current_ask(symbols)
-        bid_value = self.client.get_current_bid(symbols)
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
+        ask_value = self.client.get_current_ask(symbol)
+        bid_value = self.client.get_current_bid(symbol)
         signal = storategy.macd_renko_bb(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column
                                 , self.slope_signal_column, self.close_column_name, self.bolinger_columns["LV"], self.bolinger_columns["MV"],
                                 self.bolinger_columns["UV"], ask_value, bid_value)
@@ -265,7 +266,7 @@ class CCICross(StorategyClient):
             self.trend = ShortTrend()
         self.add_indicaters(indicaters)
             
-    def get_signal(self, df:pd.DataFrame, position=None, symbols=[]):
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal = storategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
         return signal
     
@@ -342,8 +343,8 @@ class CCIBoader(StorategyClient):
             self.trend = Trend()
         self.add_indicaters(indicaters)
             
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
-        signal = storategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)        
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
+        signal = storategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)
         return signal
     
 class RangeTrade(StorategyClient):
@@ -396,7 +397,7 @@ class RangeTrade(StorategyClient):
         self.__tp_threrad = slope_ratio
         self.add_indicaters(indicaters)
         
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal = storategy.range_experimental(position, df, self.range_possibility_column, self.trend_possibility_column,
                                               self.width_column, self.alpha, self.__tp_threrad, self.close_column)
         return signal
@@ -471,7 +472,7 @@ class MACDRenkoRange(StorategyClient):
         self.add_indicaters([renko_process, bband_process, macd_process, macd_slope, signal_slope, range_process])
 
             
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal, self.__is_in_range = storategy.macd_renko_range_ex(position, df, self.__is_in_range,
                 self.range_possibility_column, self.renko_bnum_column,
                 self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
@@ -539,7 +540,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         self.column_dict = self.client.get_ohlc_columns()
         self.__is_in_range = False
     
-    def get_signal(self, df:pd.DataFrame, position, symbols=[]):
+    def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal, self.__is_in_range = storategy.macd_renkorange_bb_ex(position, df, self.__is_in_range,
                                                  self.range_possibility_column, self.renko_bnum_column,
                                                  self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
