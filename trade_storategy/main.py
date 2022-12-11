@@ -67,13 +67,13 @@ class ParallelStorategyManager:
                 if signal.is_close:
                     results = []
                     if signal.is_buy is None:
-                        results = storategy.client.close_all_positions()
+                        results = storategy.client.close_all_positions(signal.symbol)
                         self.logger.info(f"positions are closed, remaining budget is {storategy.client.market.budget}")
                     elif signal.is_buy == True:
-                        results = storategy.client.close_short_positions()
+                        results = storategy.client.close_short_positions(signal.symbol)
                         self.logger.info(f"short positions are closed, remaining budget is {storategy.client.market.budget}")
                     elif signal.is_buy == False:
-                        results = storategy.client.close_long_positions()
+                        results = storategy.client.close_long_positions(signal.symbol)
                         self.logger.info(f"long positions are closed, remaining budget is {storategy.client.market.budget}")
                         
                     if len(results) > 0:
