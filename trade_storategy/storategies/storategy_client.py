@@ -101,7 +101,7 @@ class MACDRenko(StorategyClient):
         return MACDRenko(finance_client=finance_client, **options)
         
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, trend_threshhold=2, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, threshold=2, logger=None) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process is not None:
@@ -120,7 +120,7 @@ class MACDRenko(StorategyClient):
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
         column_dict = self.client.get_ohlc_columns()
-        self.trend_threshhold = trend_threshhold
+        self.threshold = threshold
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
         else:
@@ -137,7 +137,7 @@ class MACDRenko(StorategyClient):
 
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal = storategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
-                             self.slope_signal_column, self.close_column_name, trend_threshhold=self.trend_threshhold)
+                             self.slope_signal_column, self.close_column_name, threshold=self.threshold)
         return signal
     
 class MACDRenkoSLByBB(MACDRenko):
