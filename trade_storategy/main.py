@@ -115,7 +115,7 @@ class ParallelStorategyManager:
                     storategy.client.close_all_positions()
                     break
             if count % 10 == 0:
-                self.logger.info(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
+                self.logger.debug(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
             count+=1
         
         totalSignalCount = len(self.results[symbol])
@@ -126,7 +126,7 @@ class ParallelStorategyManager:
             winRevenute = sum(winList)
             resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
             self.logger.info(resultTxt)
-            self.logger.info(f"{buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
+            self.logger.info(f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}")
             
     def start_storategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
@@ -165,10 +165,30 @@ class ParallelStorategyManager:
     
     def stop_storategies(self):
         self.done = True
+    
+    def summary(self):
+        totalRevenue = 0
+        totalWinCount = 0
+        totalSignalCount = 0
+        totalWinRevenute = 0
+        for storategy in self.storategies:
+            symbol = storategy.client.symbols[0]
+            totalRevenue += sum(self.results[symbol])
+            totalSignalCount += len(self.results[symbol])
+            winList = list(filter(lambda x: x >= 0, self.results[symbol]))
+            totalWinCount += len(winList)
+            totalWinRevenute = sum(winList)
+        resultTxt = f"Revenute:{totalRevenue}, signal count: {totalSignalCount}, win Rate: {totalWinCount/totalSignalCount}, plus: {totalWinRevenute}, minus: {totalRevenue - totalWinRevenute}"
+        print(resultTxt)
+            
         
 class MultiSymbolStorategyManager:
+    """Storategy Manager to run a client which has multi symbols.
+    This manager caliculate signal of symbols on same time index between symbols.
+    Show results every fixed interval
+    """
     
-    def __init__(self, storategy:StorategyClient, symbols:list, days=0, hours=0, minutes=0,  logger = None) -> None:
+    def __init__(self, storategy:StorategyClient,  days=0, hours=0, minutes=0,  logger=None) -> None:
         self.event = threading.Event()
         if logger == None:
             dir = os.path.dirname(__file__)

@@ -101,7 +101,7 @@ class MACDRenko(StorategyClient):
         return MACDRenko(finance_client=finance_client, **options)
         
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, trend_threshhold=2, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, slope_window = 5, amount=1, interval_mins: int = -1, data_length=250, threshold=2, logger=None) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process is not None:
@@ -120,7 +120,7 @@ class MACDRenko(StorategyClient):
         self.macd_signal_column = macd_process.columns["Signal"]
         self.renko_bnum_column = renko_process.columns["NUM"]
         column_dict = self.client.get_ohlc_columns()
-        self.trend_threshhold = trend_threshhold
+        self.threshold = threshold
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
         else:
@@ -137,7 +137,7 @@ class MACDRenko(StorategyClient):
 
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
         signal = storategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
-                             self.slope_signal_column, self.close_column_name, trend_threshhold=self.trend_threshhold)
+                             self.slope_signal_column, self.close_column_name, threshold=self.threshold)
         return signal
     
 class MACDRenkoSLByBB(MACDRenko):
@@ -431,7 +431,7 @@ class MACDRenkoRange(StorategyClient):
         options.update(idc_options)
         return MACDRenkoRange(finance_client, **options)
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, range_process: fc.utils.RangeTrendProcess, slope_window = 5, alpha=2, amount=1, interval_mins: int = -1, data_length=250, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, range_process: fc.utils.RangeTrendProcess, slope_window = 5, alpha=2, amount=1, interval_mins: int = -1, data_length=250, threshold=2, logger=None) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
         
         if renko_process.kinds != "Renko":
@@ -450,6 +450,7 @@ class MACDRenkoRange(StorategyClient):
             self.high_column_name = "High"
             self.low_column_name = "Low"
         
+        self.threshold = threshold
         self.__is_in_range = False
 
         if range_process is None or range_process.kinds != fc.utils.RangeTrendProcess.kinds:
@@ -476,7 +477,7 @@ class MACDRenkoRange(StorategyClient):
         signal, self.__is_in_range = storategy.macd_renko_range_ex(position, df, self.__is_in_range,
                 self.range_possibility_column, self.renko_bnum_column,
                 self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
-                self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column, self.close_column_name)
+                self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column, self.threshold, self.close_column_name)
         return signal
     
 class MACDRenkoRangeSLByBB(MACDRenkoRange):
@@ -510,7 +511,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         options.update(idc_options)
         return MACDRenkoRangeSLByBB(finance_client, **options)
     
-    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, bolinger_process:fc.utils.BBANDProcess, range_process=None, slope_window = 5, amount=1, use_tp= False, interval_mins: int = -1, data_length=250, logger=None) -> None:
+    def __init__(self, finance_client: fc.Client, renko_process: fc.utils.RenkoProcess, macd_process: fc.utils.MACDProcess, bolinger_process:fc.utils.BBANDProcess, range_process=None, slope_window = 5, amount=1, use_tp= False, interval_mins: int = -1, data_length=250, threshold=2, logger=None) -> None:
         """
         add condition to open a position by Bolinger Band
         
@@ -534,7 +535,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             range_process = fc.utils.RangeTrendProcess()
         ## add BBANDPreProcess
         ##check if bolinger_process is an instannce of BBANDpreProcess
-        super().__init__(finance_client, renko_process, macd_process, range_process, slope_window, self.b_alpha, amount, interval_mins, data_length, logger)
+        super().__init__(finance_client, renko_process, macd_process, range_process, slope_window, self.b_alpha, amount, interval_mins, data_length, threshold, logger)
 
         self.use_tp = use_tp
         self.column_dict = self.client.get_ohlc_columns()
@@ -545,5 +546,5 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
                                                  self.range_possibility_column, self.renko_bnum_column,
                                                  self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
                                                  self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column,
-                                                 self.Width_column, self.alpha, self.close_column_name)
+                                                 self.Width_column, self.alpha, self.threshold, self.close_column_name)
         return signal
