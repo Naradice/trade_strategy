@@ -57,37 +57,54 @@ class ParallelStorategyManager:
                 time.sleep(sleep_time)
         
         count = 0
+        buySignalCount = 0
+        sellSignalCount = 0
+        closedCount = 0
+        closedByPendingCount = 0
+        symbol = storategy.client.symbols[0]
+        self.results[symbol] = []
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
-            signal = storategy.run(storategy.client.symbols[0])
+            signal = storategy.run(symbol)
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
             if signal and signal.order_type is not None:
                 if signal.is_close:
+                    self.logger.info(f"close signal is raised. {signal}")
                     results = []
                     if signal.is_buy is None:
                         results = storategy.client.close_all_positions(signal.symbol)
-                        self.logger.info(f"positions are closed, remaining budget is {storategy.client.market.budget}")
+                        if results:
+                            self.logger.info(f"positions are closed, remaining budget is {storategy.client.market.budget}")
                     elif signal.is_buy == True:
                         results = storategy.client.close_short_positions(signal.symbol)
-                        self.logger.info(f"short positions are closed, remaining budget is {storategy.client.market.budget}")
+                        if results:
+                            self.logger.info(f"short positions are closed, remaining budget is {storategy.client.market.budget}")
                     elif signal.is_buy == False:
                         results = storategy.client.close_long_positions(signal.symbol)
-                        self.logger.info(f"long positions are closed, remaining budget is {storategy.client.market.budget}")
+                        if results:
+                            self.logger.info(f"long positions are closed, remaining budget is {storategy.client.market.budget}")
                         
                     if len(results) > 0:
                         for result in results:
-                            if result:
-                                self.logger.info(f"closed result: {result}")
-                                self.results[storategy.key].append(result[2])
+                            if result is not None:
+                                if result[1]:
+                                    self.logger.info(f"closed result: {result[0]}")
+                                    closedCount += 1
+                                else:
+                                    self.logger.info(f"pending closed result: {result[0]}")
+                                    closedByPendingCount += 1
+                                self.results[symbol].append(result[0][2])
                 else:
                     if signal.is_buy:
                         position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                        self.logger.info(f"long position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                        self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                        buySignalCount += 1
                     elif signal.is_buy == False:
                         position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                        self.logger.info(f"short position is opened: {position} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                        self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                        sellSignalCount += 1
             if doSleep:
                 base_time = time.time()
                 next_time = ((base_time - time.time()) % interval) or interval
@@ -98,17 +115,18 @@ class ParallelStorategyManager:
                     storategy.client.close_all_positions()
                     break
             if count % 10 == 0:
-                self.logger.debug(f"{count+1} times caliculated.")
+                self.logger.info(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
             count+=1
         
-        totalSignalCount = len(self.results[storategy.key])
+        totalSignalCount = len(self.results[symbol])
         if totalSignalCount != 0:
-            revenue = sum(self.results[storategy.key])
-            winList = list(filter(lambda x: x >= 0, self.results[storategy.key]))
+            revenue = sum(self.results[symbol])
+            winList = list(filter(lambda x: x >= 0, self.results[symbol]))
             winCount = len(winList)
             winRevenute = sum(winList)
-            resultTxt = f"{storategy.key}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+            resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
             self.logger.info(resultTxt)
+            self.logger.info(f"{buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
             
     def start_storategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
