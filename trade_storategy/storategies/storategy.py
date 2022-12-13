@@ -268,7 +268,7 @@ def macd_renko_range_ex(position, df:pd.DataFrame, is_in_range,
 def macd_renkorange_bb_ex(position, df:pd.DataFrame, is_in_range,
                         range_possibility_column, renko_bnum_column, macd_column_column, macd_signal_column, slope_macd_column, slope_signal_column,
                         high_column, upper_column, low_column, lower_column, widh_column, b_alpha=2, threshold=2,
-                        order_price_column="Close",
+                        order_price_column="Close", use_tp=False,
                         ):
     key = "bmacd_renkorange_ex"
     signal, __is_in_range = macd_renko_range_ex(position, df, is_in_range, 
@@ -282,12 +282,17 @@ def macd_renkorange_bb_ex(position, df:pd.DataFrame, is_in_range,
         std = width/(b_alpha*2)
         if signal.is_buy is True:
             signal.sl = signal.order_price - std*3
+            if use_tp:
+                signal.tp = signal.order_price + std*6
         elif signal.is_buy is False:#sell case
             signal.sl = signal.order_price + std*3
+            if use_tp:
+                signal.sl = signal.order_price - std*6
         elif signal.is_close:
             pass
         else:            
             print(f"unkown signal type {signal.is_buy}")
             signal = None
+            
             
     return signal, __is_in_range

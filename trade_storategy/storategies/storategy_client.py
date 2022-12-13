@@ -521,7 +521,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             macd_process (fc.utils.MACDpreProcess): MACD Process of finance_client module
             bolinger_process (fc.utils.BBANDpreProcess): BB Process of finance_client module
             slope_window (int, optional): window to caliculate window of the close. Defaults to 5.
-            use_tp (bool, optional): Specify a method to add tp vaelue. If not to be specified, "none". Defaults to BB. ["BB", "none", "Fix Ratio"]
+            use_tp (bool, optional): take profit based on twice value of stop loss (experimental)
             interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
             data_length (int, optional): Length to caliculate the indicaters. Defaults to 250.
             logger (optional): You can pass your logger. Defaults to None.
@@ -546,5 +546,5 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
                                                  self.range_possibility_column, self.renko_bnum_column,
                                                  self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
                                                  self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column,
-                                                 self.Width_column, self.alpha, self.threshold, self.close_column_name)
+                                                 self.Width_column, self.alpha, self.threshold, self.close_column_name, self.use_tp)
         return signal
