@@ -40,7 +40,7 @@ class StorategyClient:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins
-        self.trend = Trend()#0 don't have, 1 have long_position, -1 short_position
+        self.trend = {} #0 don't have, 1 have long_position, -1 short_position
         
     def add_indicaters(self, idc_processes:list):
         for process in idc_processes:
@@ -55,13 +55,13 @@ class StorategyClient:
     
     def update_trend(self, signal:ts.Signal):
         if signal is not None:
-            self.trend = signal.trend
+            self.trend[signal.symbol] = signal.trend
     
     def get_signal(self, df, long_short: int = None, symbols=[]) -> Signal:
         print("please overwrite this method on an actual client.")
         return None
     
-    def run(self, symbol:str, long_short = None) -> ts.Signal:
+    def run(self, symbols:str or list, long_short = None) -> ts.Signal:
         """ run this storategy
 
         Args:
@@ -70,17 +70,24 @@ class StorategyClient:
         Returns:
             ts.Signal: Signal of this strategy
         """
-        if long_short is None:
-            position = self.trend.id
-        else:
-            position = long_short
-        df = self.client.get_ohlc(self.data_length, [symbol], idc_processes=self.__idc_processes)
-        signal = self.get_signal(df, position, symbol)
-        if signal is not None:
-            signal.amount = self.amount
-            signal.symbol = symbol
-            self.update_trend(signal)
-        if self.save_signal_info:
-            self.save_signal(signal, df)
+        df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
+        signals = []
+        for symbol in symbols:
+            if long_short is None:
+                if symbol in self.trend:
+                    position = self.trend[symbol].id
+                else:
+                    position = 0
+            else:
+                position = long_short
+            if df[symbol].iloc[-1].isnull().any() == False:
+                signal = self.get_signal(df[symbol], position, symbol)
+                if signal is not None:
+                    signal.amount = self.amount
+                    signal.symbol = symbol
+                    self.update_trend(signal)
+                    signals.append(signal)
+                    if self.save_signal_info:
+                        self.save_signal(signal, df)
         
-        return signal
+        return signals

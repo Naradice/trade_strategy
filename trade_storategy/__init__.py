@@ -1,5 +1,4 @@
 from trade_storategy.signal import *
 from trade_storategy.storategies.strategy_base import StorategyClient
 from trade_storategy.main import ParallelStorategyManager
-from trade_storategy.main import MultiSymbolStorategyManager
 import trade_storategy.storategies as storategies
