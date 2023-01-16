@@ -3,10 +3,10 @@ from setuptools import setup, find_packages
 install_requires = [
 ]
 
-setup(name='trade_storategy',
+setup(name='trade_strategy',
       version='0.0.1',
       packages=find_packages(),
-      data_files=['./trade_storategy/settings.json'],
+      data_files=['./trade_strategy/settings.json'],
       install_requires=install_requires,
       include_package_data=True
 )

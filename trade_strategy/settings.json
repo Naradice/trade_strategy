@@ -19,27 +19,27 @@
                 "class": "logging.FileHandler",
                 "level": "DEBUG",
                 "formatter": "simple",
-                "filename": "trade_storategy.log"
+                "filename": "trade_strategy.log"
             }
         },
 
         "loggers": {
-            "trade_storategy.main": {
+            "trade_strategy.main": {
                 "level": "INFO",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
             },
-            "trade_storategy.storategy": {
+            "trade_strategy.strategy": {
                 "level": "INFO",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
             },
-            "trade_storategy.test": {
+            "trade_strategy.test": {
                 "level": "DEBUG",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
             },
-            "trade_storategy.back_test": {
+            "trade_strategy.back_test": {
                 "level": "INFO",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false

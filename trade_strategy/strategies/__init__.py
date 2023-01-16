@@ -1,7 +1,7 @@
-from trade_storategy.storategies.strategy_base import StorategyClient
-from trade_storategy.storategies.storategy_client import *
+from .strategy_base import StrategyClient
+from .strategy_client import *
 
-def load_storategy_client(key:str, finance_client, idc_processes:list, options:dict=None):
+def load_strategy_client(key:str, finance_client, idc_processes:list, options:dict=None):
     availables = { MACDRenko.key: MACDRenko,
                   MACDCross.key: MACDCross,
                   MACDRenkoRangeSLByBB.key: MACDRenkoRangeSLByBB,
@@ -20,4 +20,4 @@ def load_storategy_client(key:str, finance_client, idc_processes:list, options:d
     if key in availables:
         return availables[key].load(finance_client, idc_processes, options)
     else:
-        raise Exception(f"{key} is not in availabe storategies {availables.keys()}")
+        raise Exception(f"{key} is not in availabe strategies {availables.keys()}")

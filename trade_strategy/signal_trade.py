@@ -7,7 +7,7 @@ import sys
 import finance_client as fc
 import pandas as pd
 
-from . import storategies
+from . import strategies
 
 available_modes = ["rating", "random"]
 
@@ -120,8 +120,8 @@ def order_by_signal_file(file_path:str, finance_client:fc.Client, mode="rating")
     else:
         print("file path doesn't exist")
         
-def list_signals(client: fc.Client, storategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
-    storategy = storategies.load_storategy_client(storategy_key, client, idc_processes, {"data_length":data_length})
+def list_signals(client: fc.Client, strategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
+    strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length":data_length})
     if signal_file_path is None:
         signal_file_path = "./signals.json"
     if os.path.exists(signal_file_path):
@@ -139,7 +139,7 @@ def list_signals(client: fc.Client, storategy_key:str, data_length=100, candidat
             has_history = True
         else:
             state = 0
-        signal = storategy.run(symbol, state)
+        signal = strategy.run(symbol, state)
         if signal is not None:
             signals[symbol] = signal.to_dict()
         elif has_history:
@@ -149,8 +149,8 @@ def list_signals(client: fc.Client, storategy_key:str, data_length=100, candidat
     print(signals)
     return signals
     
-def system_trade_one_time(client: fc.Client, storategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
-    list_signals(client, storategy_key, data_length, candidate_symbols, idc_processes, signal_file_path)
+def system_trade_one_time(client: fc.Client, strategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
+    list_signals(client, strategy_key, data_length, candidate_symbols, idc_processes, signal_file_path)
     print("start oders")
     order_by_signal_file(signal_file_path, client)
     
@@ -167,7 +167,7 @@ def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, fram
         data_length += process.get_minimum_required_length()
     for file in file_paths:
         client = CSVClient(file, ohlc_columns, date_column=date_column, idc_process=idc_processes, frame=frame)
-        storategy = storategies.load_storategy_client(strategy_key, client, idc_processes, {"data_length":data_length})
+        strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length":data_length})
         
         has_history = False
         symbol = symbols[index]
@@ -176,7 +176,7 @@ def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, fram
             has_history = True
         else:
             state = 0
-        new_signals = storategy.run(symbol, state)
+        new_signals = strategy.run(symbol, state)
         if new_signals is not None:
             if len(new_signals) > 1:
                 print(f"new_signals raised two or more for a symbol {symbol} somehow.")
@@ -213,7 +213,7 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key:str, data_length:
         
         _idc_processes = copy.copy(idc_processes)
         client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)
-        storategy = storategies.load_storategy_client(strategy_key, client, _idc_processes, {"data_length":data_length_})
+        strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length":data_length_})
         
         has_history = False
         if symbol in signals:
@@ -221,7 +221,7 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key:str, data_length:
             has_history = True
         else:
             state = 0
-        new_signals = storategy.run(symbol, state)
+        new_signals = strategy.run(symbol, state)
         if new_signals is not None:
             if len(new_signals) > 1:
                 print(f"new_signals raised two or more for a symbol {symbol} somehow.")

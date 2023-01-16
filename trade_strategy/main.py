@@ -1,14 +1,16 @@
 import datetime
-import threading
-import time
-from trade_storategy.storategies import StorategyClient
 from logging import getLogger, config
 import json
 import os
+import statistics
+import threading
+import time
 
-class ParallelStorategyManager:
+from .strategies import StrategyClient
+
+class ParallelStrategyManager:
     
-    def __init__(self, storategies:list, days=0, hours=0, minutes=0, seconds=0,  logger = None) -> None:
+    def __init__(self, strategies:list, days=0, hours=0, minutes=0, seconds=0,  logger = None) -> None:
         self.event = threading.Event()
         if logger == None:
             dir = os.path.dirname(__file__)
@@ -16,30 +18,30 @@ class ParallelStorategyManager:
                 with open(os.path.join(dir, './settings.json'), 'r') as f:
                     settings = json.load(f)
             except Exception as e:
-                self.logger.error(f"fail to load settings file on storategy main: {e}")
+                self.logger.error(f"fail to load settings file on strategy main: {e}")
                 raise e
             logger_config = settings["log"]
             try:
                 config.dictConfig(logger_config)
             except Exception as e:
-                self.logger.error(f"fail to set configure file on storategy main: {e}")
+                self.logger.error(f"fail to set configure file on strategy main: {e}")
                 raise e
             self.logger = getLogger(__name__)
         else:
             self.logger = logger
-            for storategy in storategies:
-                storategy.logger = logger
+            for strategy in strategies:
+                strategy.logger = logger
             
         self.results = {}
-        if type(storategies) == list and len(storategies) > 0:
-            self.storategies = storategies
+        if type(strategies) == list and len(strategies) > 0:
+            self.strategies = strategies
             self.__duration = datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-            for storategy in storategies:
-                self.results[storategy.key] = []
+            for strategy in strategies:
+                self.results[strategy.key] = []
         self.done = False
             
-    def __start_storategy(self, storategy: StorategyClient):
-        interval_mins = storategy.interval_mins
+    def __start_strategy(self, strategy: StrategyClient):
+        interval_mins = strategy.interval_mins
         if interval_mins > 0:
             interval = interval_mins * 60
             doSleep = True
@@ -61,13 +63,13 @@ class ParallelStorategyManager:
         sellSignalCount = 0
         closedCount = 0
         closedByPendingCount = 0
-        symbols = storategy.client.symbols
+        symbols = strategy.client.symbols
         for symbol in symbols:
             self.results[symbol] = []
             
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
-            signals = storategy.run(symbols)
+            signals = strategy.run(symbols)
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
@@ -77,17 +79,17 @@ class ParallelStorategyManager:
                         self.logger.info(f"close signal is raised. {signal}")
                         results = []
                         if signal.is_buy is None:
-                            results = storategy.client.close_all_positions(signal.symbol)
+                            results = strategy.client.close_all_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"positions are closed, remaining budget is {storategy.client.market.budget}")
+                                self.logger.info(f"positions are closed, remaining budget is {strategy.client.market.budget}")
                         elif signal.is_buy == True:
-                            results = storategy.client.close_short_positions(signal.symbol)
+                            results = strategy.client.close_short_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"short positions are closed, remaining budget is {storategy.client.market.budget}")
+                                self.logger.info(f"short positions are closed, remaining budget is {strategy.client.market.budget}")
                         elif signal.is_buy == False:
-                            results = storategy.client.close_long_positions(signal.symbol)
+                            results = strategy.client.close_long_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"long positions are closed, remaining budget is {storategy.client.market.budget}")
+                                self.logger.info(f"long positions are closed, remaining budget is {strategy.client.market.budget}")
                             
                         if len(results) > 0:
                             for result in results:
@@ -101,12 +103,12 @@ class ParallelStorategyManager:
                                     self.results[symbol].append(result[0][2])
                     else:
                         if signal.is_buy:
-                            position = storategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                            position = strategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
+                            self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.market.budget}")
                             buySignalCount += 1
                         elif signal.is_buy == False:
-                            position = storategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {storategy.client.market.budget}")
+                            position = strategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
+                            self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.market.budget}")
                             sellSignalCount += 1
             if doSleep:
                 base_time = time.time()
@@ -114,53 +116,58 @@ class ParallelStorategyManager:
                 self.logger.debug(f"wait {sleep_time} to run on next frame")
                 #time.sleep(next_time)
                 if self.event.wait(timeout=next_time):
-                    self.logger.info("Close all positions as for ending the storategies.")
-                    storategy.client.close_all_positions()
+                    self.logger.info("Close all positions as for ending the strategies.")
+                    strategy.client.close_all_positions()
                     break
             if count % 10 == 0:
                 self.logger.debug(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
-                print(storategy.client.get_portfolio())
-                print(storategy.client.get_budget())
+                print(strategy.client.get_portfolio())
+                print(strategy.client.get_budget())
             count+=1
         
-        totalSignalCount = len(self.results[symbol])
-        if totalSignalCount != 0:
-            revenue = sum(self.results[symbol])
-            winList = list(filter(lambda x: x >= 0, self.results[symbol]))
-            winCount = len(winList)
-            winRevenute = sum(winList)
-            resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
-            self.logger.info(resultTxt)
-            self.logger.info(f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}")
-            
-    def start_storategies(self, wait=True):
+        for symbol in symbols:
+            totalSignalCount = len(self.results[symbol])
+            if totalSignalCount != 0:
+                revenue = sum(self.results[symbol])
+                winList = list(filter(lambda x: x >= 0, self.results[symbol]))
+                winCount = len(winList)
+                winRevenute = sum(winList)
+                resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+                self.logger.info(resultTxt)
+                self.logger.info(f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}")
+                var = statistics.pvariance(self.results[symbol])
+                mean = statistics.mean(self.results[symbol])
+                self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
+                ## TODO: add profit per year
+                
+    def start_strategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
         self.__end_time = self.__start_time + self.__duration
         self.done = False
         
-        for storategy in self.storategies:
-            if storategy.client.do_render:
+        for strategy in self.strategies:
+            if strategy.client.do_render:
                 try:
-                    self.__start_storategy(storategy)
+                    self.__start_strategy(strategy)
                 except KeyboardInterrupt:
-                    self.logger.info("Finish the storategies as KeyboardInterrupt happened")
+                    self.logger.info("Finish the strategies as KeyboardInterrupt happened")
                     self.event.set()
                     self.done = True
                     exit()
             else:
-                t = threading.Thread(target=self.__start_storategy, args=(storategy,), daemon=False)
+                t = threading.Thread(target=self.__start_strategy, args=(strategy,), daemon=False)
                 t.start()
-                self.logger.debug("started storategy")
+                self.logger.debug("started strategy")
                 if wait:
                     try:
-                        ui = input("Please input 'exit' to end the storategies.")
+                        ui = input("Please input 'exit' to end the strategies.")
                         if ui.lower() == 'exit':
                             self.event.set()
                             self.done = True
                             if t.is_alive():
                                 exit()
                     except KeyboardInterrupt:
-                        self.logger.info("Finish the storategies as KeyboardInterrupt happened")
+                        self.logger.info("Finish the strategies as KeyboardInterrupt happened")
                         self.event.set()
                         self.done = True
                         if t.is_alive():
@@ -168,7 +175,7 @@ class ParallelStorategyManager:
                 
         
     
-    def stop_storategies(self):
+    def stop_strategies(self):
         self.done = True
     
     def summary(self):
@@ -176,8 +183,8 @@ class ParallelStorategyManager:
         totalWinCount = 0
         totalSignalCount = 0
         totalWinRevenute = 0
-        for storategy in self.storategies:
-            symbol = storategy.client.symbols[0]
+        for strategy in self.strategies:
+            symbol = strategy.client.symbols[0]
             totalRevenue += sum(self.results[symbol])
             totalSignalCount += len(self.results[symbol])
             winList = list(filter(lambda x: x >= 0, self.results[symbol]))

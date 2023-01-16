@@ -1,7 +1,7 @@
 import unittest, os, json, sys, datetime
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(module_path)
-import trade_storategy as ts
+import trade_strategy as ts
 
 class SignalTest(unittest.TestCase):
     

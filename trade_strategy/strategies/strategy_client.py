@@ -1,19 +1,22 @@
-from trade_storategy.storategies.strategy_base import StorategyClient
-from trade_storategy.signal import *
-from . import storategy
-import finance_client as fc
 import json
+
+import finance_client as fc
 import pandas as pd
+
+from .strategy_base import StrategyClient
+from ..signal import *
+from . import strategy
+
 
 ## TODO: caliculate required length from idc_processes
 
-class EMACross(StorategyClient):
+class EMACross(StrategyClient):
     pass
 
-class WMACross(StorategyClient):
+class WMACross(StrategyClient):
     pass
 
-class MACDCross(StorategyClient):
+class MACDCross(StrategyClient):
     
     key = "macd_cross"    
     
@@ -68,13 +71,13 @@ class MACDCross(StorategyClient):
         self.add_indicaters([macd])
             
     def get_signal(self, data, position, symbol:str):
-        signal, tick_trend = storategy.macd_cross(position, self.current_trend,data, self.close_column_name, self.signal_column_name,
+        signal, tick_trend = strategy.macd_cross(position, self.current_trend,data, self.close_column_name, self.signal_column_name,
                              self.macd_column_name)
         #save trend of macd
         self.current_trend = tick_trend
         return signal
         
-class MACDRenko(StorategyClient):
+class MACDRenko(StrategyClient):
     
     key="macd_renko"
     
@@ -136,7 +139,7 @@ class MACDRenko(StorategyClient):
         self.add_indicaters(indicaters)
 
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal = storategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
+        signal = strategy.macd_renko(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column,
                              self.slope_signal_column, self.close_column_name, threshold=self.threshold)
         return signal
     
@@ -199,12 +202,12 @@ class MACDRenkoSLByBB(MACDRenko):
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
         ask_value = self.client.get_current_ask(symbol)
         bid_value = self.client.get_current_bid(symbol)
-        signal = storategy.macd_renko_bb(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column
+        signal = strategy.macd_renko_bb(position, df, self.renko_bnum_column, self.macd_column_column, self.macd_signal_column, self.slope_macd_column
                                 , self.slope_signal_column, self.close_column_name, self.bolinger_columns["LV"], self.bolinger_columns["MV"],
                                 self.bolinger_columns["UV"], ask_value, bid_value)
         return signal
 
-class CCICross(StorategyClient):
+class CCICross(StrategyClient):
     
     key = "cci_cross"
     
@@ -235,7 +238,7 @@ class CCICross(StorategyClient):
         Args:
             finance_client (fc.Client): any finance_client
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
-            interval_mins (int, optional): interval minutes to get_signal this storategy. Defaults to 30.
+            interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
@@ -255,7 +258,7 @@ class CCICross(StorategyClient):
             self.close_column_name = column_dict["Close"]
         else:
             self.close_column_name = "Close"
-        self.logger.info(f"initialized cci storategy")
+        self.logger.info(f"initialized cci strategy")
         indicaters = [cci_process]
         df = self.client.get_ohlc(self.data_length, idc_processes=indicaters)
         last_df = df.iloc[-1]
@@ -267,10 +270,10 @@ class CCICross(StorategyClient):
         self.add_indicaters(indicaters)
             
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal = storategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
+        signal = strategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
         return signal
     
-class CCIBoader(StorategyClient):
+class CCIBoader(StrategyClient):
     
     key = "cci_boader"
     
@@ -303,7 +306,7 @@ class CCIBoader(StorategyClient):
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             upper (int, option): upper value to raise Buy Signal. Defaults to 100
             lower (int, option): lower value to raise Sell Signal. Defaults to -100
-            interval_mins (int, optional): interval minutes to get_signal this storategy. Defaults to 30.
+            interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
@@ -330,7 +333,7 @@ class CCIBoader(StorategyClient):
             self.close_column_name = column_dict["Close"]
         else:
             self.close_column_name = "Close"
-        self.logger.info(f"initialized cci storategy")
+        self.logger.info(f"initialized cci strategy")
         indicaters = [cci_process]
         df = self.client.get_ohlc(self.data_length, idc_processes=indicaters)
         last_df = df.iloc[-1]
@@ -344,10 +347,10 @@ class CCIBoader(StorategyClient):
         self.add_indicaters(indicaters)
             
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal = storategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)
+        signal = strategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)
         return signal
     
-class RangeTrade(StorategyClient):
+class RangeTrade(StrategyClient):
     
     key = "range"
     
@@ -398,11 +401,11 @@ class RangeTrade(StorategyClient):
         self.add_indicaters(indicaters)
         
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal = storategy.range_experimental(position, df, self.range_possibility_column, self.trend_possibility_column,
+        signal = strategy.range_experimental(position, df, self.range_possibility_column, self.trend_possibility_column,
                                               self.width_column, self.alpha, self.__tp_threrad, self.close_column)
         return signal
          
-class MACDRenkoRange(StorategyClient):
+class MACDRenkoRange(StrategyClient):
     
     key="macd_ranko_range"
     
@@ -474,7 +477,7 @@ class MACDRenkoRange(StorategyClient):
 
             
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal, self.__is_in_range = storategy.macd_renko_range_ex(position, df, self.__is_in_range,
+        signal, self.__is_in_range = strategy.macd_renko_range_ex(position, df, self.__is_in_range,
                 self.range_possibility_column, self.renko_bnum_column,
                 self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
                 self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column, self.threshold, self.close_column_name)
@@ -542,7 +545,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         self.__is_in_range = False
     
     def get_signal(self, df:pd.DataFrame, position, symbol:str):
-        signal, self.__is_in_range = storategy.macd_renkorange_bb_ex(position, df, self.__is_in_range,
+        signal, self.__is_in_range = strategy.macd_renkorange_bb_ex(position, df, self.__is_in_range,
                                                  self.range_possibility_column, self.renko_bnum_column,
                                                  self.macd_column_column, self.macd_signal_column, self.slope_macd_column, self.slope_signal_column,
                                                  self.high_column_name, self.BHigh_column, self.low_column_name, self.BLow_column,

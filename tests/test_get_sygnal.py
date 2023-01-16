@@ -1,8 +1,8 @@
 import unittest, os, json, sys, datetime
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(module_path)
-import trade_storategy as ts
-import trade_storategy.list_signals as ls
+import trade_strategy as ts
+import trade_strategy.list_signals as ls
 from finance_client.csv.client import CSVClient
 from finance_client.client_base import Client
 from finance_client.utils.idcprocess import *
@@ -68,8 +68,8 @@ class GetSignalTest():
     #     macd_signal_column = macd_p.columns["Signal"]
     #     signal_slope = SlopeProcess(key="s", target_column=macd_signal_column, window=slope_window)
 
-    #     st = ts.storategies.MACDRenko(client, renko_p, macd_p, slope_window=slope_window, interval_mins = 0, data_length=30)
-    #     sys = ls.SystemTradeCSV(file_paths=file_paths, symbols=nikkei_codes, frame=frame, storategy=st, idc_processes=[macd_p, renko_p, macd_slope, signal_slope], ohlc_columns=ohlc_columns, date_column=date_column)
+    #     st = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope_window, interval_mins = 0, data_length=30)
+    #     sys = ls.SystemTradeCSV(file_paths=file_paths, symbols=nikkei_codes, frame=frame, strategy=st, idc_processes=[macd_p, renko_p, macd_slope, signal_slope], ohlc_columns=ohlc_columns, date_column=date_column)
     #     sys.list_sygnals()
         
     def test_get_sygnal(self):
@@ -80,7 +80,7 @@ class GetSignalTest():
         macd_slope = SlopeProcess(key="m", target_column=macd_column_column, window=slope_window)
         macd_signal_column = macd_p.columns["Signal"]
         signal_slope = SlopeProcess(key="s", target_column=macd_signal_column, window=slope_window)
-        sys = ls.SystemTradeYahoo(symbols=nikkei_codes, frame=frame, storategy_key=ts.storategies.MACDRenko.key, idc_processes=[], data_length=100, adjust_close=True)
+        sys = ls.SystemTradeYahoo(symbols=nikkei_codes, frame=frame, strategy_key=ts.strategies.MACDRenko.key, idc_processes=[], data_length=100, adjust_close=True)
         sys.list_sygnals()
         
 if __name__ == '__main__':

@@ -1,11 +1,11 @@
 import finance_client as fc
-import trade_storategy as ts
+from ..signal import Signal
 import pandas as pd
 from logging import getLogger, config
 import json, os
-from trade_storategy.signal import Signal, Trend
+from trade_strategy.signal import Signal, Trend
 
-class StorategyClient:
+class StrategyClient:
 
     key = "base"
     client: fc.Client = None
@@ -16,7 +16,7 @@ class StorategyClient:
                 with open(os.path.abspath(os.path.join(os.path.dirname(__file__), '../settings.json')), 'r') as f:
                         settings = json.load(f)
             except Exception as e:
-                self.logger.error(f"fail to load settings file on storategy: {e}")
+                self.logger.error(f"fail to load settings file on strategy: {e}")
                 raise e
     
             logger_config = settings["log"]
@@ -24,10 +24,10 @@ class StorategyClient:
             try:
                 config.dictConfig(logger_config)
             except Exception as e:
-                print(f"fail to set configure file on storategy: {e}")
+                print(f"fail to set configure file on strategy: {e}")
                 raise e
 
-            logger_name = "trade_storategy.storategy"
+            logger_name = "trade_strategy.strategy"
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
@@ -53,7 +53,7 @@ class StorategyClient:
         #time, signal info, data
         pass
     
-    def update_trend(self, signal:ts.Signal):
+    def update_trend(self, signal:Signal):
         if signal is not None:
             self.trend[signal.symbol] = signal.trend
     
@@ -61,14 +61,14 @@ class StorategyClient:
         print("please overwrite this method on an actual client.")
         return None
     
-    def run(self, symbols:str or list, long_short = None) -> ts.Signal:
-        """ run this storategy
+    def run(self, symbols:str or list, long_short = None) -> Signal:
+        """ run this strategy
 
         Args:
-            long_short (int, optional): represents the trend. When manually or other storategy buy/sell, you can pass 1/-1 to this storategy. Defaults to None.
+            long_short (int, optional): represents the trend. When manually or other strategy buy/sell, you can pass 1/-1 to this strategy. Defaults to None.
 
         Returns:
-            ts.Signal: Signal of this strategy
+            Signal: Signal of this strategy
         """
         try:
             df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)

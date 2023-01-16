@@ -1,5 +1,6 @@
 import pandas as pd
-from trade_storategy.signal import *
+
+from ..signal import *
             
 def macd_cross(position, previouse_trend, data, target_column="Close", signal_column_name="Signal", macd_column_name="MACD"):
     key="macd_cross"
