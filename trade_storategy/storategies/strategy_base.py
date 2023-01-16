@@ -78,6 +78,7 @@ class StorategyClient:
         signals = []
         if type(symbols) is str:
             symbols = [symbols]
+        if len(symbols) == 1:
             get_dataframe = lambda df, key: df
         else:
             get_dataframe = lambda df, key: df[key]
