@@ -1,7 +1,7 @@
 from trade_storategy.storategies.strategy_base import StorategyClient
 from trade_storategy.storategies.storategy_client import *
 
-def load_storategy_client(key:str, finance_client, idc_processes:list, options={}):
+def load_storategy_client(key:str, finance_client, idc_processes:list, options:dict=None):
     availables = { MACDRenko.key: MACDRenko,
                   MACDCross.key: MACDCross,
                   MACDRenkoRangeSLByBB.key: MACDRenkoRangeSLByBB,
@@ -11,6 +11,11 @@ def load_storategy_client(key:str, finance_client, idc_processes:list, options={
                   MACDRenkoRange.key: MACDRenkoRange,
                   MACDRenkoRangeSLByBB.key: MACDRenkoRangeSLByBB
     }
+    
+    if idc_processes is None:
+        idc_processes = []
+    if options is None:
+        options = {}
     
     if key in availables:
         return availables[key].load(finance_client, idc_processes, options)

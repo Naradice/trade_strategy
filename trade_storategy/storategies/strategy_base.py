@@ -70,8 +70,18 @@ class StorategyClient:
         Returns:
             ts.Signal: Signal of this strategy
         """
-        df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
+        try:
+            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
+        except Exception as e:
+            self.logger.error(f"error occured when client gets ohlc data: {e}")
+            return []
         signals = []
+        if type(symbols) is str:
+            symbols = [symbols]
+            get_dataframe = lambda df, key: df
+        else:
+            get_dataframe = lambda df, key: df[key]
+            
         for symbol in symbols:
             if long_short is None:
                 if symbol in self.trend:
@@ -80,14 +90,16 @@ class StorategyClient:
                     position = 0
             else:
                 position = long_short
-            if df[symbol].iloc[-1].isnull().any() == False:
-                signal = self.get_signal(df[symbol], position, symbol)
+            
+            ohlc_df = get_dataframe(df, symbol)
+            if ohlc_df.iloc[-1].isnull().any() == False:
+                signal = self.get_signal(ohlc_df, position, symbol)
                 if signal is not None:
                     signal.amount = self.amount
                     signal.symbol = symbol
                     self.update_trend(signal)
                     signals.append(signal)
                     if self.save_signal_info:
-                        self.save_signal(signal, df)
+                        self.save_signal(signal, ohlc_df)
         
         return signals

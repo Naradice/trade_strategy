@@ -24,15 +24,14 @@ class Signal:
     trend = Trend()
     id = 0
     possibility = 0.0
-    order_type = None
-    is_buy = None
+    is_buy = None#just indicate buy or not
+    order_type = None#indicate more details of order type not just buy or sell
     is_close = False
     dev = None
     order_price = None
     tp = None#Take Profit price
     sl = None#Stop Loss price
     option_info = None
-    order_price = None
     amount = 0
     symbol = None
     
@@ -48,6 +47,34 @@ class Signal:
     
     def __str__(self) -> str:
         return f"(key={self.key}, symbol={self.symbol}, order_type={self.order_type}, possibility:{self.possibility}, is_close:{self.is_close}, is_buy:{self.is_buy}, order_price:{self.order_price}, tp: {self.tp}, sl:{self.sl}, dev:{self.dev})"
+    
+    def to_dict(self, save_option=False) -> dict:
+        basic_dict = {
+            "id":self.id, "symbol": self.symbol, "order_type": self.order_type, "possibility":self.possibility,
+            "is_buy": self.is_buy, "is_close": self.is_close, "dev": self.dev, "order_price": self.order_price,
+            "tp":self.tp, "sl":self.sl, "amount": self.amount, "symbol":self.symbol, "signal":self.key
+        }
+        if save_option:
+            basic_dict["option"] = self.option_info
+        return basic_dict
+    
+    @classmethod
+    def load_dict(parameters):
+        id = parameters["id"]
+        amount = parameters["amount"]
+        price = parameters["order_price"]
+        tp = parameters["tp"]
+        sl = parameters["sl"]
+        possibility = parameters["possibility"]
+        
+        if id == 1:
+            return BuySignal("", amount, price, tp, sl)
+        elif id == -1:
+            return SellSignal("", amount, price, tp, sl)
+        elif id == 10:
+            return CloseSignal("", price, possibility)
+        else:
+            print("this id is not supported for now.")
     
 class BuySignal(Signal):
     key = "buy"
