@@ -287,7 +287,7 @@ def macd_renkorange_bb_ex(position, df:pd.DataFrame, is_in_range,
         elif signal.is_buy is False:#sell case
             signal.sl = signal.order_price + std*3
             if use_tp:
-                signal.sl = signal.order_price - std*6
+                signal.tp = signal.order_price - std*6
         elif signal.is_close:
             pass
         else:            
