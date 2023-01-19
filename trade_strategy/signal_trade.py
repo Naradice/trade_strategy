@@ -1,4 +1,5 @@
 import copy
+import datetime
 import json
 import os
 import random
@@ -19,54 +20,108 @@ def __close(client:fc.Client, symbol, state):
         position_type = "bid"
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
-    return client.close_position(symbol=symbol, order_type=position_type)
+    result, suc = client.close_position(symbol=symbol, order_type=position_type)
+    return suc, result
 
 def __order(client:fc.Client, symbol:str, signal:str, state:str):
+    symbol = __convert_symbol(symbol)
     if signal == "buy":
         suc, result =  client.open_trade(is_buy=True, amount=1, order_type="Market", symbol=symbol)
         return suc, result, 1
     elif signal == "sell":
         suc, result = client.open_trade(is_buy=False, amount=1, order_type="Market", symbol=symbol)
         return suc, result, -1
-    elif signal == "close":
+    elif "close" in signal:
         suc, result = __close(client, symbol, state)
         return suc, result, 0
+    else:
+        return False, "unexpected signal", state
 
 def __signal_order(client, signal_df, symbols):
+    signal_series = signal_df["signal"]
+    state_series = signal_df["state"]
+    results = {}
     for symbol in symbols:
+        symbol4order = __convert_symbol(symbol)
         signal = None
-        signal_series = signal_df.loc["signal"]
-        state_series = signal_df.loc["state"]
         try:
             signal = signal_series[symbol]
             state = state_series[symbol]
         except KeyError:
             continue
         if signal is not None:
-            return __order(client, symbol, signal, state)
+            suc, result, result_state = __order(client, symbol4order, signal, state)
+            if suc:
+                results[symbol] = result_state
+    return results
+
+def __convert_symbol(symbol:str):
+    if ".T" in symbol:
+        return symbol.replace(".T", "")
+    else:
+        return symbol
             
 def __random_order(client, signal_df):
     signals = signal_df["signal"]#index has symbols, value has buy or sell. order is irrelevant
-    symbols = random.sample(signals.index, k=len(signals))#randomize symbols
-    return __signal_order(client, signals, symbols)
+    symbols = random.sample(list(signals.index), k=len(signals))#randomize symbols
+    return __signal_order(client, signal_df, symbols)
 
 def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
-    if hasattr(client, "get_ratings"):
-        symbol_convertion = {}
-        for symbol in signals.index:
-            #convert Yahoo format for JPN to common format
-            if ".T" in symbol:
-                new_symbol = symbol.replace(".T", "")
-                symbol_convertion[new_symbol] = symbol
+    if os.path.exists("./symbols_info.json"):
+        with open("./symbols_info.json", mode="r") as fp:
+            existing_info = json.load(fp)
+    else:
+        existing_info = {}
+    RATING_KEY = "ratings"
+        
+    symbol_convertion = {}
+    for symbol in signals.index:
+        #convert Yahoo format for JPN to common format
+        new_symbol = __convert_symbol(symbol)
+        symbol_convertion[new_symbol] = symbol
+    symbols = list(symbol_convertion.keys())
+    
+    ratings = {}
+    if RATING_KEY in existing_info:
+        ratings = existing_info[RATING_KEY]
+    
+    if hasattr(client, "get_rating"):
+        # check if symbol rating is already updated
+        new_symbols = []
+        existing_rates = {}
+        for symbol in symbols:
+            if symbol in ratings:
+                rate_info = ratings[symbol]
+                try:
+                    date = rate_info["update_date"]
+                    existing_date = datetime.datetime.fromisoformat(date)
+                except AttributeError:
+                    existing_date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
+                except Exception as e:
+                    print(f"can't determin update_date of {symbol}")
+                    new_symbols.append(symbol)
+                    continue
+                delta = datetime.datetime.now() - existing_date
+                threshold = datetime.timedelta(days=1)
+                if delta >= threshold:
+                    new_symbols.append(symbol)
+                else:
+                    existing_rates[symbol] = rate_info
             else:
-                symbol_convertion[symbol] = symbol
-        symbols = list(symbol_convertion.values())
-        ## assume columns=["mean", "var", "amount"], index=symbols
-        ratings = client.get_ratings(symbols)
+                new_symbols.append(symbol)
+        existing_rates_df = pd.DataFrame()
+        if len(existing_rates) > 0:
+            existing_rates_df = pd.DataFrame.from_dict(existing_rates, orient="index")
+            existing_rates_df = existing_rates_df[["mean", "var", "amount"]]
+        new_ratings_df = pd.DataFrame()
+        if len(new_symbols) > 0:
+            ## assume columns=["mean", "var", "amount"], index=symbols
+            new_ratings_df = client.get_rating(new_symbols)
+        rating_df = pd.concat([existing_rates_df, new_ratings_df], axis=0)
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
-        if len(ratings) > 0:
-            candidate_df = ratings[ratings["amount" > amount_threthold]]
-            candidate_df = candidate_df[candidate_df["mean" > mean_threthold]]
+        if len(rating_df) > 0:
+            candidate_df = rating_df[rating_df["amount"] > amount_threthold]
+            candidate_df = candidate_df[candidate_df["mean"] > mean_threthold]
             candidate_df.sort_values(by="var", ascending=True, inplace=True)
             org_index = []
             for symbol in candidate_df.index:
@@ -76,9 +131,22 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
                     print(f"Unexpectedly symbol({symbol}) is not found on symbol_conversion.")
                     org_index.append(symbol)
             candidate_df.index = org_index
+            candidate_df = pd.concat([candidate_df, signals.loc[candidate_df.index]], axis=1)
             
             remaining_df = signals.loc[list(set(signals.index) - set(candidate_df.index))]
-            return candidate_df, remaining_df
+            
+            try:
+                new_ratings = new_ratings_df.to_dict(orient="index")
+                update_date = datetime.datetime.now().isoformat()
+                for symbol in new_ratings.keys():
+                    new_ratings[symbol]["update_date"] = update_date
+                ratings.update(new_ratings)
+                existing_info[RATING_KEY] = ratings
+                with open("./symbols_info.json", mode="w") as fp:
+                    json.dump(existing_info, fp)
+            except Exception:
+                print("failed to save rating info.")
+            return True, candidate_df, remaining_df
         else:
             return False, None, None
     return False, None, None
@@ -88,25 +156,38 @@ def order_by_signals(signals, finance_client:fc.Client, mode="rating"):
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
         sig_df = sig_df.loc[sig_sr.index]
+        # ignore symbols already have
+        sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == False)]
+        new_states = {}
         if "state" in sig_df:
             if mode == "rating":
                 suc, rating_df, remain_df = __add_rating(finance_client, sig_df)
                 if suc:
                     signals = rating_df["signal"]
+                    states = rating_df["state"]
+                    print("start ordering based on ratings")
                     for symbol in rating_df.index:
                         signal = None
                         try:
                             signal = signals[symbol]
+                            state = states[symbol]
                         except KeyError:
                             continue
                         if signal is not None:
-                            suc, result = __order(finance_client, symbol, signal)
+                            suc, result, result_state = __order(finance_client, symbol, signal, state)
+                            if suc:
+                                new_states[symbol] = result_state
                     ## handle remainings
-                    __random_order(finance_client, remain_df)
+                    print("start ordering randomly")
+                    new_states_rand = __random_order(finance_client, remain_df)
+                    new_states.update(new_states_rand)
+                else:
+                    print("Failed to get ratings.")
             elif mode == "random":
-                __random_order(finance_client, sig_df)
+                new_states = __random_order(finance_client, sig_df)
             else:
                 raise ValueError(f"Unkown mode {mode} is specified.")
+            return new_states
         else:
             print("unkown signal format.")
     else:
@@ -197,6 +278,9 @@ def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, fram
         json.dump(signals, fp)
     return signals
 
+def save_signals(signals:dict):
+    with open("./signals.json", mode="w") as fp:
+        json.dump(signals, fp)
     
 def list_sygnals_with_yahoo(symbols: list, frame, strategy_key:str, data_length: int, idc_processes=[], adjust_close=True):
     from finance_client.yfinance.client import YahooClient
@@ -230,7 +314,11 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key:str, data_length:
                 signal_dict = signal.to_dict()
                 signal_dict["state"] = state
                 signals[symbol] = signal_dict
-                print(f"{symbol}: {signal}")
+                if state == 0:
+                    print(f"new signal of {symbol}: {signal}")
+                elif state == 1 or state == -1:
+                    if signal_dict["is_close"]:
+                        print(f"close signal of {symbol}: {signal}")
         elif has_history:
             if state == 0:
                 print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
