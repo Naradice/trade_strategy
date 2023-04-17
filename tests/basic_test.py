@@ -4,7 +4,7 @@ sys.path.append(module_path)
 import trade_strategy as ts
 from finance_client.client_base import Client
 from finance_client.csv.client import CSVClient
-from finance_client.utils.idcprocess import *
+from finance_client.fprocess.idcprocess import *
 
 class Test(unittest.TestCase):
     

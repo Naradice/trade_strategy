@@ -12,21 +12,24 @@ from . import strategies
 
 available_modes = ["rating", "random"]
 
-def __close(client:fc.Client, symbol, state):
+
+def __close(client: fc.Client, symbol, state):
     position_type = None
-    if state == "1":
+    if state == 1:
         position_type = "ask"
-    elif state == "-1":
+    elif state == -1:
         position_type = "bid"
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
     result, suc = client.close_position(symbol=symbol, order_type=position_type)
     return suc, result
 
-def __order(client:fc.Client, symbol:str, signal:str, state:str):
+
+def __order(client: fc.Client, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
     if signal == "buy":
-        suc, result =  client.open_trade(is_buy=True, amount=1, order_type="Market", symbol=symbol)
+        print(f"buy order: {symbol}")
+        suc, result = client.open_trade(is_buy=True, amount=1, order_type="Market", symbol=symbol)
         return suc, result, 1
     elif signal == "sell":
         suc, result = client.open_trade(is_buy=False, amount=1, order_type="Market", symbol=symbol)
@@ -36,6 +39,7 @@ def __order(client:fc.Client, symbol:str, signal:str, state:str):
         return suc, result, 0
     else:
         return False, "unexpected signal", state
+
 
 def __signal_order(client, signal_df, symbols):
     signal_series = signal_df["signal"]
@@ -53,18 +57,23 @@ def __signal_order(client, signal_df, symbols):
             suc, result, result_state = __order(client, symbol4order, signal, state)
             if suc:
                 results[symbol] = result_state
+            else:
+                results[symbol] = 0
     return results
 
-def __convert_symbol(symbol:str):
+
+def __convert_symbol(symbol: str):
     if ".T" in symbol:
         return symbol.replace(".T", "")
     else:
         return symbol
-            
+
+
 def __random_order(client, signal_df):
-    signals = signal_df["signal"]#index has symbols, value has buy or sell. order is irrelevant
-    symbols = random.sample(list(signals.index), k=len(signals))#randomize symbols
+    signals = signal_df["signal"]  # index has symbols, value has buy or sell. order is irrelevant
+    symbols = random.sample(list(signals.index), k=len(signals))  # randomize symbols
     return __signal_order(client, signal_df, symbols)
+
 
 def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
     if os.path.exists("./symbols_info.json"):
@@ -73,18 +82,18 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
     else:
         existing_info = {}
     RATING_KEY = "ratings"
-        
+
     symbol_convertion = {}
     for symbol in signals.index:
-        #convert Yahoo format for JPN to common format
+        # convert Yahoo format for JPN to common format
         new_symbol = __convert_symbol(symbol)
         symbol_convertion[new_symbol] = symbol
     symbols = list(symbol_convertion.keys())
-    
+
     ratings = {}
     if RATING_KEY in existing_info:
         ratings = existing_info[RATING_KEY]
-    
+
     if hasattr(client, "get_rating"):
         # check if symbol rating is already updated
         new_symbols = []
@@ -132,9 +141,9 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
                     org_index.append(symbol)
             candidate_df.index = org_index
             candidate_df = pd.concat([candidate_df, signals.loc[candidate_df.index]], axis=1)
-            
+
             remaining_df = signals.loc[list(set(signals.index) - set(candidate_df.index))]
-            
+
             try:
                 new_ratings = new_ratings_df.to_dict(orient="index")
                 update_date = datetime.datetime.now().isoformat()
@@ -151,14 +160,31 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
             return False, None, None
     return False, None, None
 
-def order_by_signals(signals, finance_client:fc.Client, mode="rating"):
+
+def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
     if len(signals) > 0:
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
         sig_df = sig_df.loc[sig_sr.index]
+        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == True)]
         # ignore symbols already have
-        sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == False)]
+        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] == False)]
+        # sig_df = pd.concat([close_sig_df, sig_df], axis=0)
+        signals = close_sig_df["signal"]
+        states = close_sig_df["state"]
         new_states = {}
+        if len(close_sig_df) > 0:
+            print(f"start closing positions {list(close_sig_df.index)}")
+        for symbol in close_sig_df.index:
+            signal = None
+            try:
+                signal = signals[symbol]
+                state = states[symbol]
+            except KeyError:
+                continue
+            suc, result, result_state = __order(finance_client, symbol, signal, state)
+            new_states[symbol] = result_state
+
         if "state" in sig_df:
             if mode == "rating":
                 suc, rating_df, remain_df = __add_rating(finance_client, sig_df)
@@ -185,6 +211,8 @@ def order_by_signals(signals, finance_client:fc.Client, mode="rating"):
                     print("Failed to get ratings.")
             elif mode == "random":
                 new_states = __random_order(finance_client, sig_df)
+            elif mode == "none" or mode is None:
+                pass
             else:
                 raise ValueError(f"Unkown mode {mode} is specified.")
             return new_states
@@ -193,16 +221,20 @@ def order_by_signals(signals, finance_client:fc.Client, mode="rating"):
     else:
         print("no signals specified.")
 
-def order_by_signal_file(file_path:str, finance_client:fc.Client, mode="rating"):
+
+def order_by_signal_file(file_path: str, finance_client: fc.Client, mode="rating"):
     if os.path.exists(file_path):
         with open(file_path) as fp:
             signals = json.load(fp)
         order_by_signals(signals)
     else:
         print("file path doesn't exist")
-        
-def list_signals(client: fc.Client, strategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
-    strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length":data_length})
+
+
+def list_signals(
+    client: fc.Client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
+):
+    strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length": data_length})
     if signal_file_path is None:
         signal_file_path = "./signals.json"
     if os.path.exists(signal_file_path):
@@ -212,7 +244,7 @@ def list_signals(client: fc.Client, strategy_key:str, data_length=100, candidate
         signals = {}
     if candidate_symbols is None:
         candidate_symbols = client.symbols
-        
+
     for symbol in candidate_symbols:
         has_history = False
         if symbol in signals:
@@ -229,15 +261,28 @@ def list_signals(client: fc.Client, strategy_key:str, data_length=100, candidate
     print("-----------------------------------------")
     print(signals)
     return signals
-    
-def system_trade_one_time(client: fc.Client, strategy_key:str, data_length=100, candidate_symbols:list=None, idc_processes:list=None, signal_file_path:str=None):
+
+
+def system_trade_one_time(
+    client: fc.Client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
+):
     list_signals(client, strategy_key, data_length, candidate_symbols, idc_processes, signal_file_path)
     print("start oders")
     order_by_signal_file(signal_file_path, client)
-    
-def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, frame:int=60*24,
-                            data_length: int = 100, idc_processes=[], ohlc_columns=["Open", "High", "Low", "Close"], date_column="Timestamp"):
+
+
+def list_sygnals_with_csv(
+    file_paths: list,
+    symbols: list,
+    strategy_key: str,
+    frame: int = 60 * 24,
+    data_length: int = 100,
+    idc_processes=[],
+    ohlc_columns=["Open", "High", "Low", "Close"],
+    date_column="Timestamp",
+):
     from finance_client.csv.client import CSVClient
+
     if os.path.exists("./signals.json"):
         with open("./signals.json", mode="r") as fp:
             signals = json.load(fp)
@@ -248,8 +293,8 @@ def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, fram
         data_length += process.get_minimum_required_length()
     for file in file_paths:
         client = CSVClient(file, ohlc_columns, date_column=date_column, idc_process=idc_processes, frame=frame)
-        strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length":data_length})
-        
+        strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length": data_length})
+
         has_history = False
         symbol = symbols[index]
         if symbol in signals:
@@ -278,27 +323,30 @@ def list_sygnals_with_csv(file_paths: list, symbols:list, strategy_key:str, fram
         json.dump(signals, fp)
     return signals
 
-def save_signals(signals:dict):
+
+def save_signals(signals: dict):
     with open("./signals.json", mode="w") as fp:
         json.dump(signals, fp)
-    
-def list_sygnals_with_yahoo(symbols: list, frame, strategy_key:str, data_length: int, idc_processes=[], adjust_close=True):
+
+
+def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length: int, idc_processes=[], adjust_close=True):
     from finance_client.yfinance.client import YahooClient
+
     if os.path.exists("./signals.json"):
         with open("./signals.json", mode="r") as fp:
             signals = json.load(fp)
     else:
         signals = {}
-        
+
     data_length_ = data_length
     for process in idc_processes:
-            data_length_ += process.get_minimum_required_length()
+        data_length_ += process.get_minimum_required_length()
     for symbol in symbols:
-        
+
         _idc_processes = copy.copy(idc_processes)
         client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)
-        strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length":data_length_})
-        
+        strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length": data_length_})
+
         has_history = False
         if symbol in signals:
             state = int(signals[symbol]["state"])

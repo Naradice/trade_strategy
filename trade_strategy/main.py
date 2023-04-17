@@ -139,6 +139,7 @@ class ParallelStrategyManager:
                 mean = statistics.mean(self.results[symbol])
                 self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
                 ## TODO: add profit per year
+        print(f"Storategy Ended. Frame: {strategy.client.frame}")
                 
     def start_strategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
