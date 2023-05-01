@@ -161,7 +161,7 @@ class CloseSignal(Signal):
         self.order_price = price
         self.possibility = possibility
         self.symbol = symbol
-
+        self.key = "close"
         self.trend = Trend()
         self.id = 10
         self.order_type = MarketOrderKey
