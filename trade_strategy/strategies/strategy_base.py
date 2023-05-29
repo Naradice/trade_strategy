@@ -101,17 +101,17 @@ class StrategyClient:
                     position = 0
             else:
                 position = long_short
-
             ohlc_df = get_dataframe(df, symbol)
-            if ohlc_df.iloc[-1].isnull().any() == False:
-                signal = self.get_signal(ohlc_df, position, symbol)
-                if signal is not None:
-                    signal.amount = self.amount
-                    signal.symbol = symbol
-                    self.update_trend(signal)
-                    signals.append(signal)
-                    if self.save_signal_info:
-                        self.save_signal(signal, ohlc_df)
+            if ohlc_df.iloc[-1].isnull().any() == True:
+                print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
+            signal = self.get_signal(ohlc_df, position, symbol)
+            if signal is not None:
+                signal.amount = self.amount
+                signal.symbol = symbol
+                self.update_trend(signal)
+                signals.append(signal)
+                if self.save_signal_info:
+                    self.save_signal(signal, ohlc_df)
 
         return signals
 

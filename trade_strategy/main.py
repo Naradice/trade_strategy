@@ -66,7 +66,7 @@ class ParallelStrategyManager:
         symbols = strategy.client.symbols
         for symbol in symbols:
             self.results[symbol] = []
-            
+        
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
             signals = strategy.run(symbols)

@@ -14,6 +14,7 @@ available_modes = ["rating", "random"]
 
 
 def __close(client: fc.Client, symbol, state):
+    symbol = __convert_symbol(symbol)
     position_type = None
     if state == 1:
         position_type = "ask"
@@ -27,17 +28,22 @@ def __close(client: fc.Client, symbol, state):
 
 def __order(client: fc.Client, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
-    if signal == "buy":
+    if signal == "buy" and state == 0:
         print(f"buy order: {symbol}")
         suc, result = client.open_trade(is_buy=True, amount=1, order_type="Market", symbol=symbol)
         return suc, result, 1
-    elif signal == "sell":
+    elif signal == "sell" and state == 0:
+        print(f"sell order: {symbol}")
         suc, result = client.open_trade(is_buy=False, amount=1, order_type="Market", symbol=symbol)
         return suc, result, -1
     elif "close" in signal:
+        print(f"close order: {symbol}")
         suc, result = __close(client, symbol, state)
         return suc, result, 0
+    elif "base" == signal:
+        pass
     else:
+        print(f"Unkown signal: {signal} is specified for {symbol} with {state}")
         return False, "unexpected signal", state
 
 
@@ -181,9 +187,13 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
                 signal = signals[symbol]
                 state = states[symbol]
             except KeyError:
+                print(f"key {symbol} not found on signals. continue with next symbol")
                 continue
-            suc, result, result_state = __order(finance_client, symbol, signal, state)
-            new_states[symbol] = result_state
+            except Exception:
+                print(f"unkown error for {symbol} on order_by_signals. continue with next symbol")
+                continue
+            suc, result = __close(finance_client, symbol, state)
+            new_states[symbol] = 0
 
         if "state" in sig_df:
             if mode == "rating":
@@ -203,7 +213,7 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
                             suc, result, result_state = __order(finance_client, symbol, signal, state)
                             if suc:
                                 new_states[symbol] = result_state
-                    ## handle remainings
+                    # handle remainings
                     print("start ordering randomly")
                     new_states_rand = __random_order(finance_client, remain_df)
                     new_states.update(new_states_rand)
@@ -329,7 +339,7 @@ def save_signals(signals: dict):
         json.dump(signals, fp)
 
 
-def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length: int, idc_processes=[], adjust_close=True):
+def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length: int, idc_processes=[], adjust_close=True, save_signals=True):
     from finance_client.yfinance.client import YahooClient
 
     if os.path.exists("./signals.json"):
@@ -373,8 +383,9 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
                 signals.pop(symbol)
         del client
         del _idc_processes
-    print("-----------------------------------------")
-    print(signals)
-    with open("./signals.json", mode="w") as fp:
-        json.dump(signals, fp)
+    # print("-----------------------------------------")
+    # print(signals)
+    if save_signals:
+        with open("./signals.json", mode="w") as fp:
+            json.dump(signals, fp)
     return signals

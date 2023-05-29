@@ -153,7 +153,6 @@ class SellPendingOrderSignal(Signal):
 
 class CloseSignal(Signal):
     "signal to close all position"
-    key = "close"
 
     def __init__(self, std_name, price: float = None, possibility: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
@@ -171,12 +170,6 @@ class CloseSignal(Signal):
 
 class CloseBuySignal(Signal):
     "signal to close short position"
-    key = "close_buy"
-    trend = Trend()
-    id = 11
-    order_type = MarketOrderKey
-    is_buy = True
-    is_close = True
 
     def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0) -> None:
         super().__init__(std_name)
@@ -185,16 +178,16 @@ class CloseBuySignal(Signal):
         self.tp = tp
         self.sl = sl
         self.possibility = possibility
+        self.key = "close_buy"
+        self.id = 11
+        self.trend = Trend()
+        self.order_type = MarketOrderKey
+        self.is_buy = True
+        self.is_close = True
 
 
 class CloseSellSignal(Signal):
     "signal to close short position"
-    key = "close_sell"
-    trend = Trend()
-    id = -11
-    order_type = MarketOrderKey
-    is_buy = False
-    is_close = True
 
     def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0) -> None:
         super().__init__(std_name)
@@ -203,20 +196,25 @@ class CloseSellSignal(Signal):
         self.tp = tp
         self.sl = sl
         self.possibility = possibility
+        self.key = "close_sell"
+        self.trend = Trend()
+        self.id = -11
+        self.order_type = MarketOrderKey
+        self.is_buy = False
+        self.is_close = True
 
 
 class ValueRangeSignal(Signal):
-    key = ("value_range",)
-    trend = Trend()
-    id = 100
-    order_type = None
-    is_buy = None
-
     def __init__(self, std_name, pricees: list, possibilities: list = None, amount=1) -> None:
         super().__init__(std_name)
         self.order_price = pricees  # [High, Low]
         self.amount = amount
         self.possibility = possibilities
+        self.key = ("value_range",)
+        self.trend = Trend()
+        self.id = 100
+        self.order_type = None
+        self.is_buy = None
 
 
 class SignalInfo:

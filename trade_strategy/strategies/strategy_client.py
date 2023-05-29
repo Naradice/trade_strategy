@@ -3,12 +3,70 @@ import json
 import finance_client as fc
 import pandas as pd
 
+from trade_strategy.signal import Signal
+
 from .strategy_base import StrategyClient
 from ..signal import *
 from . import strategy
 
 
 ## TODO: caliculate required length from idc_processes
+
+
+class SlopeChange(StrategyClient):
+
+    key = "slope_change"
+
+    def __init__(
+        self,
+        finance_client: fc.Client,
+        slope_column,
+        short_ema_column,
+        long_ema_column,
+        bb_width_column,
+        rsi_column,
+        idc_processes=[],
+        interval_mins: int = -1,
+        amount=1,
+        data_length: int = 100,
+        save_signal_info=False,
+        order_price_column="close",
+        slope_threshold=5,
+        ema_threshold=0.1,
+        rsi_threshold=70,
+        logger=None,
+    ) -> None:
+        # TODO: add ema and slope if client doesn't have
+        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        self.slope_column = slope_column
+        self.short_ema_column = short_ema_column
+        self.long_ema_column = long_ema_column
+        self.bb_width_column = bb_width_column
+        self.rsi_column = rsi_column
+        self.ema_threshold = ema_threshold
+        self.order_price_column = order_price_column
+        self.slope_threshold = slope_threshold
+        self.rsi_threshold = rsi_threshold
+
+    @classmethod
+    def get_required_idc_param_keys(self):
+        return {}
+
+    def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
+        return strategy.slope_change(
+            long_short,
+            df,
+            slope_column=self.slope_column,
+            short_ema_column=self.short_ema_column,
+            long_ema_column=self.long_ema_column,
+            bb_width_column=self.bb_width_column,
+            rsi_column=self.rsi_column,
+            amount=self.amount,
+            order_price_column=self.order_price_column,
+            slope_threshold=self.slope_threshold,
+            ema_threshold=self.ema_threshold,
+            rsi_threshold=self.rsi_threshold,
+        )
 
 
 class EMACross(StrategyClient):
@@ -26,7 +84,7 @@ class MACDCross(StrategyClient):
     @classmethod
     def get_required_idc_param_keys(self):
         MACDProcessParamKey = "macd_process"
-        return {fc.utils.MACDProcess.kinds: MACDProcessParamKey}
+        return {fc.fprocess.MACDProcess.kinds: MACDProcessParamKey}
 
     @classmethod
     def load(self, finance_client, idc_processes=[], options={}):
@@ -54,15 +112,15 @@ class MACDCross(StrategyClient):
         """
         super().__init__(finance_client, [], interval_mins, data_length, logger)
         if macd_process is None:
-            macd = fc.utils.MACDProcess()
+            macd = fc.fprocess.MACDProcess()
         else:
             if macd.kinds == "MACD":
                 macd = macd_process
             else:
                 raise Exception("MACDCross accept only MACDProcess")
 
-        self.macd_column_name = macd.columns["MACD"]
-        self.signal_column_name = macd.columns["Signal"]
+        self.macd_column_name = macd.KEY_MACD
+        self.signal_column_name = macd.KEY_SIGNAL
         column_dict = self.client.get_ohlc_columns()
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
@@ -88,7 +146,7 @@ class MACDRenko(StrategyClient):
     def get_required_idc_param_keys(self):
         RenkoProcessParamKey = "renko_process"
         MACDProcessParamKey = "macd_process"
-        return {fc.utils.RenkoProcess.kinds: RenkoProcessParamKey, fc.utils.MACDProcess.kinds: MACDProcessParamKey}
+        return {fc.fprocess.RenkoProcess.kinds: RenkoProcessParamKey, fc.fprocess.MACDProcess.kinds: MACDProcessParamKey}
 
     @classmethod
     def load(self, finance_client: fc.Client, idc_processes: list, options={}):
@@ -106,8 +164,8 @@ class MACDRenko(StrategyClient):
     def __init__(
         self,
         finance_client: fc.Client,
-        renko_process: fc.utils.RenkoProcess,
-        macd_process: fc.utils.MACDProcess,
+        renko_process: fc.fprocess.RenkoProcess,
+        macd_process: fc.fprocess.MACDProcess,
         slope_window=5,
         amount=1,
         interval_mins: int = -1,
@@ -122,16 +180,16 @@ class MACDRenko(StrategyClient):
                 raise Exception("renko_process accept only RenkoProcess")
         else:
             ohlc_dict = finance_client.get_ohlc_columns()
-            renko_process = fc.utils.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
+            renko_process = fc.fprocess.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
         if macd_process is not None:
             if macd_process.kinds != "MACD":
                 raise Exception("macd_process accept only MACDProcess")
         else:
             ohlc_dict = finance_client.get_ohlc_columns()
-            macd_process = fc.utils.MACDProcess(target_column=ohlc_dict["Close"])
-        self.macd_column_column = macd_process.columns["MACD"]
-        self.macd_signal_column = macd_process.columns["Signal"]
-        self.renko_bnum_column = renko_process.columns["NUM"]
+            macd_process = fc.fprocess.MACDProcess(target_column=ohlc_dict["Close"])
+        self.macd_column_column = macd_process.KEY_MACD
+        self.macd_signal_column = macd_process.KEY_SIGNAL
+        self.renko_bnum_column = renko_process.KEY_BRICK_NUM
         column_dict = self.client.get_ohlc_columns()
         self.threshold = threshold
         if type(column_dict) == dict:
@@ -139,10 +197,10 @@ class MACDRenko(StrategyClient):
         else:
             self.close_column_name = "Close"
 
-        macd_slope = fc.utils.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
-        signal_slope = fc.utils.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
-        self.slope_macd_column = macd_slope.columns["Slope"]
-        self.slope_signal_column = signal_slope.columns["Slope"]
+        macd_slope = fc.fprocess.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
+        signal_slope = fc.fprocess.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
+        self.slope_macd_column = macd_slope.KEY_SLOPE
+        self.slope_signal_column = signal_slope.KEY_SLOPE
 
         # when same key of process is already added, the process is ignored
         indicaters = [renko_process, macd_process, macd_slope, signal_slope]
@@ -173,9 +231,9 @@ class MACDRenkoSLByBB(MACDRenko):
         MACDProcessParamKey = "macd_process"
         BBANDProcessParamKey = "bolinger_process"
         return {
-            fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
-            fc.utils.MACDProcess.kinds: MACDProcessParamKey,
-            fc.utils.BBANDProcess.kinds: BBANDProcessParamKey,
+            fc.fprocess.RenkoProcess.kinds: RenkoProcessParamKey,
+            fc.fprocess.MACDProcess.kinds: MACDProcessParamKey,
+            fc.fprocess.BBANDProcess.kinds: BBANDProcessParamKey,
         }
 
     @classmethod
@@ -195,9 +253,9 @@ class MACDRenkoSLByBB(MACDRenko):
     def __init__(
         self,
         finance_client: fc.Client,
-        renko_process: fc.utils.RenkoProcess,
-        macd_process: fc.utils.MACDProcess,
-        bolinger_process: fc.utils.BBANDProcess,
+        renko_process: fc.fprocess.RenkoProcess,
+        macd_process: fc.fprocess.MACDProcess,
+        bolinger_process: fc.fprocess.BBANDProcess,
         slope_window=5,
         amount=1,
         use_tp=False,
@@ -211,9 +269,9 @@ class MACDRenkoSLByBB(MACDRenko):
 
         Args:
             finance_client (fc.Client): Cliet
-            renko_process (fc.utils.RenkoProcess): Renko Process of finance_client module
-            macd_process (fc.utils.MACDpreProcess): MACD Process of finance_client module
-            bolinger_process (fc.utils.BBANDpreProcess): BB Process of finance_client module
+            renko_process (fc.fprocess.RenkoProcess): Renko Process of finance_client module
+            macd_process (fc.fprocess.MACDpreProcess): MACD Process of finance_client module
+            bolinger_process (fc.fprocess.BBANDpreProcess): BB Process of finance_client module
             slope_window (int, optional): window to caliculate window of the close. Defaults to 5.
             use_tp (bool, optional): Specify a method to add tp vaelue. If not to be specified, "none". Defaults to BB. ["BB", "none", "Fix Ratio"]
             interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
@@ -234,7 +292,11 @@ class MACDRenkoSLByBB(MACDRenko):
         )
 
         ##initialize required columns
-        self.bolinger_columns = bolinger_process.columns
+        self.bolinger_columns = {
+            "LV": bolinger_process.KEY_LOWER_VALUE,
+            "MV": bolinger_process.KEY_MEAN_VALUE,
+            "UV": bolinger_process.KEY_UPPER_VALUE,
+        }
         self.b_option = bolinger_process.option
         self.b_alpha = self.b_option["alpha"]
         ## add BBANDPreProcess
@@ -270,7 +332,7 @@ class CCICross(StrategyClient):
     def get_required_idc_param_keys(self):
         CCIProcessParamKey = "cci_process"
         return {
-            fc.utils.CCIProcess.kinds: CCIProcessParamKey,
+            fc.fprocess.CCIProcess.kinds: CCIProcessParamKey,
         }
 
     @classmethod
@@ -302,12 +364,12 @@ class CCICross(StrategyClient):
         """
         super().__init__(finance_client, [], interval_mins, data_length, logger)
         if cci_process == None:
-            cci_process = fc.utils.CCIProcess()
+            cci_process = fc.fprocess.CCIProcess()
         else:
             if cci_process.kinds != "CCI":
                 raise Exception("CCICross accept only CCIProcess")
 
-        self.cci_column_name = cci_process.columns["CCI"]
+        self.cci_column_name = cci_process.KEY_CCI
         column_dict = self.client.get_ohlc_columns()
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
@@ -337,7 +399,7 @@ class CCIBoader(StrategyClient):
     def get_required_idc_param_keys(self):
         CCIProcessParamKey = "cci_process"
         return {
-            fc.utils.CCIProcess.kinds: CCIProcessParamKey,
+            fc.fprocess.CCIProcess.kinds: CCIProcessParamKey,
         }
 
     @classmethod
@@ -380,12 +442,12 @@ class CCIBoader(StrategyClient):
             self.lower = lower
 
         if cci_process == None:
-            cci_process = fc.utils.CCIProcess()
+            cci_process = fc.fprocess.CCIProcess()
         else:
             if cci_process.kinds != "CCI":
                 raise Exception("CCICross accept only CCIProcess")
 
-        self.cci_column_name = cci_process.columns["CCI"]
+        self.cci_column_name = cci_process.KEY_CCI
         column_dict = self.client.get_ohlc_columns()
         if type(column_dict) == dict:
             self.close_column_name = column_dict["Close"]
@@ -417,7 +479,7 @@ class RangeTrade(StrategyClient):
     def get_required_idc_param_keys(self):
         RangeProcessParamKey = "range_process"
         return {
-            fc.utils.RangeTrendProcess.kinds: RangeProcessParamKey,
+            fc.fprocess.RangeTrendProcess.kinds: RangeProcessParamKey,
         }
 
     @classmethod
@@ -451,20 +513,20 @@ class RangeTrade(StrategyClient):
         self.high_column = ohlc_columns["High"]
         self.low_column = ohlc_columns["Low"]
         if range_process is None:
-            range_process = fc.utils.RangeTrendProcess()
-        bband_process = fc.utils.BBANDProcess(target_column=self.close_column, alpha=alpha)
+            range_process = fc.fprocess.RangeTrendProcess()
+        bband_process = fc.fprocess.BBANDProcess(target_column=self.close_column, alpha=alpha)
         indicaters = [bband_process, range_process]
         ##initialize params of range indicater
         temp = finance_client.do_render
         finance_client.do_render = False
         finance_client.get_ohlc(idc_processes=indicaters)
         finance_client.do_render = temp
-        self.trend_possibility_column = range_process.columns["trend"]
-        self.range_possibility_column = range_process.columns["range"]
-        self.width_column = bband_process.columns["Width"]
-        self.UV_column = bband_process.columns["UV"]
-        self.LV_column = bband_process.columns["LV"]
-        self.MV_column = bband_process.columns["MV"]
+        self.trend_possibility_column = range_process.KEY_TREND
+        self.range_possibility_column = range_process.KEY_RANGE
+        self.width_column = bband_process.KEY_WIDTH_VALUE
+        self.UV_column = bband_process.KEY_UPPER_VALUE
+        self.LV_column = bband_process.KEY_LOWER_VALUE
+        self.MV_column = bband_process.KEY_MEAN_VALUE
         self.alpha = alpha
         self.__tp_threrad = slope_ratio
         self.add_indicaters(indicaters)
@@ -493,9 +555,9 @@ class MACDRenkoRange(StrategyClient):
         RenkoProcessParamKey = "renko_process"
         MACDProcessParamKey = "macd_process"
         return {
-            fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
-            fc.utils.RangeTrendProcess.kinds: RangeProcessParamKey,
-            fc.utils.MACDProcess.kinds: MACDProcessParamKey,
+            fc.fprocess.RenkoProcess.kinds: RenkoProcessParamKey,
+            fc.fprocess.RangeTrendProcess.kinds: RangeProcessParamKey,
+            fc.fprocess.MACDProcess.kinds: MACDProcessParamKey,
         }
 
     @classmethod
@@ -515,9 +577,9 @@ class MACDRenkoRange(StrategyClient):
     def __init__(
         self,
         finance_client: fc.Client,
-        renko_process: fc.utils.RenkoProcess,
-        macd_process: fc.utils.MACDProcess,
-        range_process: fc.utils.RangeTrendProcess,
+        renko_process: fc.fprocess.RenkoProcess,
+        macd_process: fc.fprocess.MACDProcess,
+        range_process: fc.fprocess.RangeTrendProcess,
         slope_window=5,
         alpha=2,
         amount=1,
@@ -547,23 +609,23 @@ class MACDRenkoRange(StrategyClient):
         self.threshold = threshold
         self.__is_in_range = False
 
-        if range_process is None or range_process.kinds != fc.utils.RangeTrendProcess.kinds:
-            range_process = fc.utils.RangeTrendProcess()
-        bband_process = fc.utils.BBANDProcess(target_column=self.close_column_name, alpha=alpha)
+        if range_process is None or range_process.kinds != fc.fprocess.RangeTrendProcess.kinds:
+            range_process = fc.fprocess.RangeTrendProcess()
+        bband_process = fc.fprocess.BBANDProcess(target_column=self.close_column_name, alpha=alpha)
         self.alpha = alpha
-        self.macd_column_column = macd_process.columns["MACD"]
-        self.macd_signal_column = macd_process.columns["Signal"]
-        self.renko_bnum_column = renko_process.columns["NUM"]
+        self.macd_column_column = macd_process.KEY_MACD
+        self.macd_signal_column = macd_process.KEY_SIGNAL
+        self.renko_bnum_column = renko_process.KEY_BRICK_NUM
 
-        macd_slope = fc.utils.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
-        signal_slope = fc.utils.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
-        self.slope_macd_column = macd_slope.columns["Slope"]
-        self.slope_signal_column = signal_slope.columns["Slope"]
-        self.trend_possibility_column = range_process.columns["trend"]
-        self.range_possibility_column = range_process.columns["range"]
-        self.Width_column = bband_process.columns["Width"]
-        self.BHigh_column = bband_process.columns["UV"]
-        self.BLow_column = bband_process.columns["LV"]
+        macd_slope = fc.fprocess.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
+        signal_slope = fc.fprocess.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
+        self.slope_macd_column = macd_slope.KEY_SLOPE
+        self.slope_signal_column = signal_slope.KEY_SLOPE
+        self.trend_possibility_column = range_process.KEY_TREND
+        self.range_possibility_column = range_process.KEY_RANGE
+        self.Width_column = bband_process.KEY_WIDTH_VALUE
+        self.BHigh_column = bband_process.KEY_UPPER_VALUE
+        self.BLow_column = bband_process.KEY_LOWER_VALUE
         self.add_indicaters([renko_process, bband_process, macd_process, macd_slope, signal_slope, range_process])
 
     def get_signal(self, df: pd.DataFrame, position, symbol: str):
@@ -598,10 +660,10 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         MACDProcessParamKey = "macd_process"
         BBANDProcessParamKey = "bolinger_process"
         return {
-            fc.utils.RenkoProcess.kinds: RenkoProcessParamKey,
-            fc.utils.RangeTrendProcess.kinds: RangeProcessParamKey,
-            fc.utils.MACDProcess.kinds: MACDProcessParamKey,
-            fc.utils.BBANDProcess.kinds: BBANDProcessParamKey,
+            fc.fprocess.RenkoProcess.kinds: RenkoProcessParamKey,
+            fc.fprocess.RangeTrendProcess.kinds: RangeProcessParamKey,
+            fc.fprocess.MACDProcess.kinds: MACDProcessParamKey,
+            fc.fprocess.BBANDProcess.kinds: BBANDProcessParamKey,
         }
 
     @classmethod
@@ -621,9 +683,9 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
     def __init__(
         self,
         finance_client: fc.Client,
-        renko_process: fc.utils.RenkoProcess,
-        macd_process: fc.utils.MACDProcess,
-        bolinger_process: fc.utils.BBANDProcess,
+        renko_process: fc.fprocess.RenkoProcess,
+        macd_process: fc.fprocess.MACDProcess,
+        bolinger_process: fc.fprocess.BBANDProcess,
         range_process=None,
         slope_window=5,
         amount=1,
@@ -638,9 +700,9 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
 
         Args:
             finance_client (fc.Client): Cliet
-            renko_process (fc.utils.RenkoProcess): Renko Process of finance_client module
-            macd_process (fc.utils.MACDpreProcess): MACD Process of finance_client module
-            bolinger_process (fc.utils.BBANDpreProcess): BB Process of finance_client module
+            renko_process (fc.fprocess.RenkoProcess): Renko Process of finance_client module
+            macd_process (fc.fprocess.MACDpreProcess): MACD Process of finance_client module
+            bolinger_process (fc.fprocess.BBANDpreProcess): BB Process of finance_client module
             slope_window (int, optional): window to caliculate window of the MACD and Signal. Defaults to 5.
             use_tp (bool, optional): take profit based on twice value of stop loss (experimental)
             interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
@@ -652,8 +714,8 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         self.bolinger_columns = bolinger_process.columns
         self.b_option = bolinger_process.option
         self.b_alpha = self.b_option["alpha"]
-        if range_process is None or range_process.kinds != fc.utils.RangeTrendProcess.kinds:
-            range_process = fc.utils.RangeTrendProcess()
+        if range_process is None or range_process.kinds != fc.fprocess.RangeTrendProcess.kinds:
+            range_process = fc.fprocess.RangeTrendProcess()
         ## add BBANDPreProcess
         ##check if bolinger_process is an instannce of BBANDpreProcess
         super().__init__(
@@ -704,7 +766,7 @@ class Momentum(StrategyClient):
 
     def __init__(
         self,
-        financre_client: fc.Client,
+        finance_client: fc.Client,
         momentum_column,
         short_ma_column,
         atr_column,
@@ -729,7 +791,7 @@ class Momentum(StrategyClient):
         self.baseline_ma_column = baseline_ma_column
         self.threshold = threshold
         self.risk_factor = risk_factor
-        super().__init__(financre_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
 
     def get_signals(self, df, positions, symbols):
         signals = strategy.momentum_ma(
