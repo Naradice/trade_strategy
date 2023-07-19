@@ -10,9 +10,9 @@ from .strategies import StrategyClient
 
 class ParallelStrategyManager:
     
-    def __init__(self, strategies:list, days=0, hours=0, minutes=0, seconds=0,  logger = None) -> None:
+    def __init__(self, strategies:list, days=0, hours=0, minutes=0, seconds=0, logger = None) -> None:
         self.event = threading.Event()
-        if logger == None:
+        if logger is None:
             dir = os.path.dirname(__file__)
             try:
                 with open(os.path.join(dir, './settings.json'), 'r') as f:
@@ -81,34 +81,35 @@ class ParallelStrategyManager:
                         if signal.is_buy is None:
                             results = strategy.client.close_all_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"positions are closed, remaining budget is {strategy.client.market.budget}")
+                                self.logger.info(f"positions are closed, remaining budget is {strategy.client.wallet.budget}")
                         elif signal.is_buy == True:
                             results = strategy.client.close_short_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"short positions are closed, remaining budget is {strategy.client.market.budget}")
+                                self.logger.info(f"short positions are closed, remaining budget is {strategy.client.wallet.budget}")
                         elif signal.is_buy == False:
                             results = strategy.client.close_long_positions(signal.symbol)
                             if results:
-                                self.logger.info(f"long positions are closed, remaining budget is {strategy.client.market.budget}")
+                                self.logger.info(f"long positions are closed, remaining budget is {strategy.client.wallet.budget}")
                             
                         if len(results) > 0:
                             for result in results:
+                                # (price, position.price, price_diff, profit, True)
                                 if result is not None:
-                                    if result[1]:
-                                        self.logger.info(f"closed result: {result[0]}")
+                                    if result[-1]:
+                                        self.logger.info(f"closed result: {result}")
                                         closedCount += 1
                                     else:
-                                        self.logger.info(f"pending closed result: {result[0]}")
+                                        self.logger.info(f"pending closed result: {result}")
                                         closedByPendingCount += 1
-                                    self.results[symbol].append(result[0][2])
+                                    self.results[symbol].append(result[2])
                     else:
                         if signal.is_buy:
                             position = strategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.market.budget}")
+                            self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}")
                             buySignalCount += 1
                         elif signal.is_buy == False:
                             position = strategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.market.budget}")
+                            self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}")
                             sellSignalCount += 1
             if doSleep:
                 base_time = time.time()

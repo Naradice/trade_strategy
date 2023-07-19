@@ -12,7 +12,7 @@ from . import strategy
 
 ## TODO: caliculate required length from idc_processes
 
-
+# Experimental. You may lose your money.
 class SlopeChange(StrategyClient):
 
     key = "slope_change"
@@ -47,13 +47,14 @@ class SlopeChange(StrategyClient):
         self.order_price_column = order_price_column
         self.slope_threshold = slope_threshold
         self.rsi_threshold = rsi_threshold
+        self.__in_range = False
 
     @classmethod
     def get_required_idc_param_keys(self):
         return {}
 
     def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
-        return strategy.slope_change(
+        signal, self.__in_range = strategy.slope_change(
             long_short,
             df,
             slope_column=self.slope_column,
@@ -66,7 +67,9 @@ class SlopeChange(StrategyClient):
             slope_threshold=self.slope_threshold,
             ema_threshold=self.ema_threshold,
             rsi_threshold=self.rsi_threshold,
+            in_range=self.__in_range,
         )
+        return signal
 
 
 class EMACross(StrategyClient):

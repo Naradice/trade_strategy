@@ -3,6 +3,97 @@ import pandas as pd
 from ..signal import *
 
 
+# Experimental
+# TODO: Improve Close condition
+# Add listening option
+def slope_change(
+    position,
+    df: pd.DataFrame,
+    slope_column,
+    short_ema_column,
+    long_ema_column,
+    bb_width_column,
+    rsi_column,
+    slope_length=3,
+    slope_threshold=5,
+    ema_threshold=0.1,
+    rsi_threshold=70,
+    order_price_column="Close",
+    amount=1,
+    in_range=False,
+):
+    key = "slope_change"
+    slope_srs = df[slope_column].iloc[-slope_length:]
+    #pre_slope_value = slope_srs.iloc[-6:-1].mean()
+    last_slope_value = slope_srs.iloc[-3:].mean()
+    signal = None
+    # momentum = df[short_ema_column].iloc[-1] - df[long_ema_column].iloc[-1]
+    trend_possibility = df[bb_width_column].iloc[-1]
+    # print(trend_possibility, pre_slope_value, " -> ", last_slope_value, df[rsi_column].iloc[-1])
+    
+
+    if position == 0:
+        if last_slope_value > slope_threshold and rsi_threshold > df[rsi_column].iloc[-1]:
+            if trend_possibility > ema_threshold:
+                signal = BuySignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                in_range = False
+            elif trend_possibility > -ema_threshold:
+                signal = SellSignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                in_range = True
+        elif last_slope_value < -slope_threshold and rsi_threshold > df[rsi_column].iloc[-1]:
+            if trend_possibility < -ema_threshold:
+                signal = SellSignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                in_range = False
+            elif trend_possibility < ema_threshold:
+                signal = BuySignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                in_range = True
+    else:
+        if in_range:
+            if position == -1:
+                if trend_possibility > ema_threshold:
+                    print(f"closed by trend {ema_threshold} as range ended")
+                    signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
+                elif rsi_threshold < df[rsi_column].iloc[-1]:
+                    print(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
+                    signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
+                elif last_slope_value > slope_threshold:
+                    print(f"closed by slope {last_slope_value} in range")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+            elif position == 1:
+                if trend_possibility < -ema_threshold:
+                    print(f"closed by trend {ema_threshold} as range ended")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+                elif rsi_threshold < df[rsi_column].iloc[-1]:
+                    print(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
+                    signal = CloseSellSignal(key, price=df[order_price_column].iloc[-1])
+                elif last_slope_value < -slope_threshold:
+                    print(f"closed by slope {last_slope_value}")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+        else:
+            if position == -1:
+                if rsi_threshold < df[rsi_column].iloc[-1]:
+                    print(f"closed by rsi {df[rsi_column].iloc[-1]}")
+                    signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
+                elif trend_possibility > ema_threshold / 2:
+                    print(f"closed by trend {ema_threshold}")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+                elif last_slope_value > slope_threshold:
+                    print(f"closed by slope {last_slope_value}")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+            elif position == 1:
+                if rsi_threshold < df[rsi_column].iloc[-1]:
+                    print(f"closed by rsi {df[rsi_column].iloc[-1]}")
+                    signal = CloseSellSignal(key, price=df[order_price_column].iloc[-1])
+                elif trend_possibility < -ema_threshold / 2:
+                    print(f"closed by trend {ema_threshold}")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+                elif last_slope_value < -slope_threshold:
+                    print(f"closed by slope {last_slope_value}")
+                    signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
+                
+    return signal, in_range
+
+
 def macd_cross(position, previouse_trend, data, target_column="Close", signal_column_name="Signal", macd_column_name="MACD"):
     key = "macd_cross"
 
@@ -228,19 +319,25 @@ def range_experimental(
         if position == 0:
             if tp < -slope_ratio:
                 signal = BuySignal(
-                    key, df[order_price_column].iloc[-1], tp=df[order_price_column].iloc[-1] + std * 4, sl=df[order_price_column].iloc[-1] - std * 2
+                    key,
+                    price=df[order_price_column].iloc[-1],
+                    tp=df[order_price_column].iloc[-1] + std * 4,
+                    sl=df[order_price_column].iloc[-1] - std * 2,
                 )
             elif tp < slope_ratio:  # Unbalance
                 pass
             else:
                 signal = SellSignal(
-                    key, df[order_price_column].iloc[-1], sl=df[order_price_column].iloc[-1] + std * 2, tp=df[order_price_column].iloc[-1] - std * 4
+                    key,
+                    price=df[order_price_column].iloc[-1],
+                    sl=df[order_price_column].iloc[-1] + std * 2,
+                    tp=df[order_price_column].iloc[-1] - std * 4,
                 )
         elif position == -1:
             if tp < -slope_ratio:
-                signal = CloseSignal(key, df[order_price_column].iloc[-1])
+                signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
             elif tp < slope_ratio:
-                signal = CloseSignal(key, df[order_price_column].iloc[-1])
+                signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
             else:
                 # wait as we have long position on long trend
                 pass
@@ -249,9 +346,9 @@ def range_experimental(
                 # wait as we have short position on short trend
                 pass
             elif tp < slope_ratio:
-                signal = CloseSignal(key, df[order_price_column].iloc[-1])
+                signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
             else:
-                signal = CloseSignal(key, df[order_price_column].iloc[-1])
+                signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
     else:
         if position != 0:
             if position == 1 and tp > slope_ratio:
@@ -259,7 +356,7 @@ def range_experimental(
             elif position == -1 and tp < -slope_ratio:
                 pass
             else:
-                signal = CloseSignal(key, df[order_price_column].iloc[-1])
+                signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
                 # logger.info("Colose signal as range trend end.")
     return signal
 

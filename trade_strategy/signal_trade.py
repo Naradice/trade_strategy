@@ -23,7 +23,11 @@ def __close(client: fc.Client, symbol, state):
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
     result, suc = client.close_position(symbol=symbol, order_type=position_type)
-    return suc, result
+    if suc:
+        price, position_price, price_diff, profit = result
+    else:
+        price, position_price, price_diff, profit = None, None, None, None
+    return suc, (price, position_price, price_diff, profit)
 
 
 def __order(client: fc.Client, symbol: str, signal: str, state: str):
@@ -135,8 +139,8 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
         rating_df = pd.concat([existing_rates_df, new_ratings_df], axis=0)
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
         if len(rating_df) > 0:
-            candidate_df = rating_df[rating_df["amount"] > amount_threthold]
-            candidate_df = candidate_df[candidate_df["mean"] > mean_threthold]
+            candidate_df_all = rating_df[rating_df["amount"] > amount_threthold]
+            candidate_df = candidate_df_all[candidate_df_all["mean"] > mean_threthold]
             candidate_df.sort_values(by="var", ascending=True, inplace=True)
             org_index = []
             for symbol in candidate_df.index:
@@ -148,7 +152,7 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
             candidate_df.index = org_index
             candidate_df = pd.concat([candidate_df, signals.loc[candidate_df.index]], axis=1)
 
-            remaining_df = signals.loc[list(set(signals.index) - set(candidate_df.index))]
+            remaining_df = signals.loc[list(set(signals.index) - set(candidate_df_all.index))]
 
             try:
                 new_ratings = new_ratings_df.to_dict(orient="index")
@@ -354,7 +358,11 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
     for symbol in symbols:
 
         _idc_processes = copy.copy(idc_processes)
-        client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)
+        try:
+            client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)
+        except Exception:
+            print(f"failed to get data of {symbol}. continue with next symbol.")
+            continue
         strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length": data_length_})
 
         has_history = False
