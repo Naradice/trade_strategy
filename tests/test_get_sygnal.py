@@ -247,7 +247,7 @@ ohlc_columns = ["Open", "High", "Low", "Adj Close"]
 
 
 class GetSignalTest:
-    def test_get_sygnal(self):
+    def test_get_sygnal_with_arbitrary_client(self):
         observation_length = 100
         slope_window = 3
         client = CSVClient(files=file_paths, columns=ohlc_columns, date_column=date_column, start_index=observation_length)
@@ -257,10 +257,15 @@ class GetSignalTest:
         signal_slope = SlopeProcess(key="s", target_column=macd_p.KEY_SIGNAL, window=slope_window)
 
         signals = signal_trade.list_signals(
-            client, ts.strategies.MACDRenko.key, observation_length, nikkei_codes, idc_processes=[macd_p, renko_p, macd_slope, signal_slope]
+            client,
+            ts.strategies.MACDRenko.key,
+            observation_length,
+            nikkei_codes,
+            idc_processes=[macd_p, renko_p, macd_slope, signal_slope],
+            signal_file_path="./arbital_client_test_signls.json",
         )
 
 
 if __name__ == "__main__":
     st = GetSignalTest()
-    st.test_get_sygnal()
+    st.test_get_sygnal_with_arbitrary_client()

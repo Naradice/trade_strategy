@@ -4,7 +4,7 @@ finance_module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 sys.path.append(finance_module_path)
 from finance_client.client_base import Client
 from finance_client.csv.client import CSVClient
-from finance_client.fprocess.idcprocess import *
+from finance_client.fprocess.fprocess.idcprocess import *
 
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(module_path)
