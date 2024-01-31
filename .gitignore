@@ -15,8 +15,8 @@ trade_strategy.egg-info
 __pycache__/
 /sandbox
 /dist
-*trade_strategy*.logs
-*trade_strategy*.log
+*.logs
+*.log
 tests/mt5*
 tests/env.test.json
 tests/cc_*
