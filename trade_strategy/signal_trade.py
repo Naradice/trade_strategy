@@ -263,9 +263,20 @@ def list_signals(
             has_history = True
         else:
             state = 0
-        signal = strategy.run(symbol, state)
-        if signal is not None:
-            signals[symbol] = signal.to_dict()
+        new_signals = strategy.run(symbol, state)
+        if new_signals is not None:
+            if len(new_signals) > 1:
+                print(f"new_signals raised two or more for a symbol {symbol} somehow.")
+            elif len(new_signals) > 0:
+                signal = new_signals[0]
+                signal_dict = signal.to_dict()
+                signal_dict["state"] = state
+                signals[symbol] = signal_dict
+                if state == 0:
+                    print(f"new signal of {symbol}: {signal}")
+                elif state == 1 or state == -1:
+                    if signal_dict["is_close"]:
+                        print(f"close signal of {symbol}: {signal}")
         elif has_history:
             if state == 0:
                 signals.pop(symbol)
@@ -353,7 +364,6 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
     for process in idc_processes:
         data_length_ += process.get_minimum_required_length()
     for symbol in symbols:
-
         _idc_processes = copy.copy(idc_processes)
         try:
             client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)

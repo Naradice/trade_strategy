@@ -3,7 +3,7 @@ import unittest, os, json, sys, datetime
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(module_path)
 import trade_strategy as ts
-import trade_strategy.list_signals as ls
+import trade_strategy.signal_trade as signal_trade
 from finance_client.csv.client import CSVClient
 from finance_client.client_base import Client
 from finance_client.fprocess.fprocess.idcprocess import *
@@ -240,10 +240,7 @@ nikkei_codes = [
     "7974.T",
 ]
 base_path = os.path.dirname(__file__)
-file_paths = [
-    os.path.abspath(os.path.join(base_path, f"../../stocknet/finance_client/finance_client/data_source/yfinance/yfinance_{symbol}_D1.csv"))
-    for symbol in nikkei_codes
-]
+file_paths = [os.path.abspath(os.path.abspath(os.path.join(base_path, f"L:/data/yfinance/yfinance_{symbol}_D1.csv"))) for symbol in nikkei_codes]
 frame = 60 * 24
 date_column = "Datetime"
 ohlc_columns = ["Open", "High", "Low", "Adj Close"]
@@ -251,44 +248,19 @@ ohlc_columns = ["Open", "High", "Low", "Adj Close"]
 
 class GetSignalTest:
     def test_get_sygnal(self):
+        observation_length = 100
         slope_window = 3
-        client = CSVClient(file=file_paths[0], columns=ohlc_columns, date_column=date_column)
-        columns = client.get_ohlc_columns()
-        macd_p = MACDpreProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
-        renko_p = RenkoProcess(window=30, date_column=columns["Time"], ohlc_column=ohlc_columns)
-        macd_column_column = macd_p.columns["MACD"]
-        macd_slope = SlopeProcess(key="m", target_column=macd_column_column, window=slope_window)
-        macd_signal_column = macd_p.columns["Signal"]
-        signal_slope = SlopeProcess(key="s", target_column=macd_signal_column, window=slope_window)
+        client = CSVClient(files=file_paths, columns=ohlc_columns, date_column=date_column, start_index=observation_length)
+        macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
+        renko_p = RenkoProcess(window=30, ohlc_column=ohlc_columns)
+        macd_slope = SlopeProcess(key="m", target_column=macd_p.KEY_MACD, window=slope_window)
+        signal_slope = SlopeProcess(key="s", target_column=macd_p.KEY_SIGNAL, window=slope_window)
 
-        st = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope_window, interval_mins=0, data_length=30)
-        sys = ls.SystemTradeCSV(
-            file_paths=file_paths,
-            symbols=nikkei_codes,
-            frame=frame,
-            strategy=st,
-            idc_processes=[macd_p, renko_p, macd_slope, signal_slope],
-            ohlc_columns=ohlc_columns,
-            date_column=date_column,
+        signals = signal_trade.list_signals(
+            client, ts.strategies.MACDRenko.key, observation_length, nikkei_codes, idc_processes=[macd_p, renko_p, macd_slope, signal_slope]
         )
-        sys.list_sygnals()
-
-    # def test_get_sygnal(self):
-    #     slope_window = 3
-    #     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9)
-    #     renko_p = RenkoProcess(window=30)
-    #     macd_column_column = macd_p.columns["MACD"]
-    #     macd_slope = SlopeProcess(key="m", target_column=macd_column_column, window=slope_window)
-    #     macd_signal_column = macd_p.columns["Signal"]
-    #     signal_slope = SlopeProcess(key="s", target_column=macd_signal_column, window=slope_window)
-    #     sys = ls.SystemTradeYahoo(
-    #         symbols=nikkei_codes, frame=frame, strategy_key=ts.strategies.MACDRenko.key, idc_processes=[], data_length=100, adjust_close=True
-    #     )
-    #     sys.list_sygnals()
 
 
 if __name__ == "__main__":
-    # unittest.main()
-
     st = GetSignalTest()
     st.test_get_sygnal()
