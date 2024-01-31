@@ -24,3 +24,5 @@ trade/
 ts_venv/
 env.json
 /ts_env
+venv*/
+back_test/*_mt5*
