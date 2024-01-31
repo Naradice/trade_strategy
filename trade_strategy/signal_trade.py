@@ -242,6 +242,26 @@ def order_by_signal_file(file_path: str, finance_client: fc.Client, mode="rating
         print("file path doesn't exist")
 
 
+def __add_state_to_signal(signals, state, symbol):
+    if signals is None:
+        return None
+    if len(signals) > 1:
+        print("signal raised two or more somehow.")
+        return None
+    elif len(signals) > 0:
+        signal = signals[0]
+        signal_dict = signal.to_dict()
+        signal_dict["state"] = state
+        if state == 0:
+            print(f"new signal of {symbol}: {signal}")
+        elif state == 1 or state == -1:
+            if signal_dict["is_close"]:
+                print(f"close signal of {symbol}: {signal}")
+        return signal_dict
+    else:
+        return None
+
+
 def list_signals(
     client: fc.Client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
 ):
@@ -264,24 +284,14 @@ def list_signals(
         else:
             state = 0
         new_signals = strategy.run(symbol, state)
-        if new_signals is not None:
-            if len(new_signals) > 1:
-                print(f"new_signals raised two or more for a symbol {symbol} somehow.")
-            elif len(new_signals) > 0:
-                signal = new_signals[0]
-                signal_dict = signal.to_dict()
-                signal_dict["state"] = state
-                signals[symbol] = signal_dict
-                if state == 0:
-                    print(f"new signal of {symbol}: {signal}")
-                elif state == 1 or state == -1:
-                    if signal_dict["is_close"]:
-                        print(f"close signal of {symbol}: {signal}")
+        signal_dict = __add_state_to_signal(new_signals, state, symbol)
+        if signal_dict is not None:
+            signals[symbol] = signal_dict
         elif has_history:
             if state == 0:
                 signals.pop(symbol)
-    print("-----------------------------------------")
-    print(signals)
+    with open(signal_file_path, mode="w") as fp:
+        json.dump(signals, fp)
     return signals
 
 
@@ -314,7 +324,7 @@ def list_sygnals_with_csv(
     for process in idc_processes:
         data_length += process.get_minimum_required_length()
     for file in file_paths:
-        client = CSVClient(file, ohlc_columns, date_column=date_column, idc_process=idc_processes, frame=frame)
+        client = CSVClient(file, ohlc_columns, date_column=date_column, idc_process=idc_processes, frame=frame, start_index=data_length)
         strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length": data_length})
 
         has_history = False
@@ -325,22 +335,14 @@ def list_sygnals_with_csv(
         else:
             state = 0
         new_signals = strategy.run(symbol, state)
-        if new_signals is not None:
-            if len(new_signals) > 1:
-                print(f"new_signals raised two or more for a symbol {symbol} somehow.")
-            elif len(new_signals) > 0:
-                signal = new_signals[0]
-                signal_dict = signal.to_dict()
-                signal_dict["state"] = state
-                signals[symbol] = signal_dict
-                print(f"{symbol}: {signal}")
+        signal_dict = __add_state_to_signal(new_signals, state, symbol)
+        if signal_dict is not None:
+            signals[symbol] = signal_dict
         elif has_history:
             if state == 0:
                 print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
                 signals.pop(symbol)
         index += 1
-    print("-----------------------------------------")
-    print(signals)
     with open("./signals.json", mode="w") as fp:
         json.dump(signals, fp)
     return signals
@@ -379,27 +381,15 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
         else:
             state = 0
         new_signals = strategy.run(symbol, state)
-        if new_signals is not None:
-            if len(new_signals) > 1:
-                print(f"new_signals raised two or more for a symbol {symbol} somehow.")
-            elif len(new_signals) > 0:
-                signal = new_signals[0]
-                signal_dict = signal.to_dict()
-                signal_dict["state"] = state
-                signals[symbol] = signal_dict
-                if state == 0:
-                    print(f"new signal of {symbol}: {signal}")
-                elif state == 1 or state == -1:
-                    if signal_dict["is_close"]:
-                        print(f"close signal of {symbol}: {signal}")
+        signal_dict = __add_state_to_signal(new_signals, state, symbol)
+        if signal_dict is not None:
+            signals[symbol] = signal_dict
         elif has_history:
             if state == 0:
                 print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
                 signals.pop(symbol)
         del client
         del _idc_processes
-    # print("-----------------------------------------")
-    # print(signals)
     if save_signals:
         with open("./signals.json", mode="w") as fp:
             json.dump(signals, fp)
