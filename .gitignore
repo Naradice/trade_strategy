@@ -17,6 +17,7 @@ __pycache__/
 /dist
 *.logs
 *.log
+*.json
 tests/mt5*
 tests/env.test.json
 tests/cc_*

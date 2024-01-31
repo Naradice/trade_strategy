@@ -8,10 +8,6 @@ from finance_client.csv.client import CSVClient
 from finance_client.client_base import Client
 from finance_client.fprocess.fprocess.idcprocess import *
 
-import dotenv
-
-dotenv.load_dotenv(".env")
-
 nikkei_codes = [
     "1333.T",
     "1332.T",
@@ -264,6 +260,7 @@ class GetSignalTest:
             idc_processes=[macd_p, renko_p, macd_slope, signal_slope],
             signal_file_path="./arbital_client_test_signls.json",
         )
+        signal_trade.order_by_signals(signals, client, "random")
 
 
 if __name__ == "__main__":
