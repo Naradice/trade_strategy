@@ -117,8 +117,8 @@ class ParallelStrategyManager:
                 self.logger.debug(f"wait {sleep_time} to run on next frame")
                 #time.sleep(next_time)
                 if self.event.wait(timeout=next_time):
-                    self.logger.info("Close all positions as for ending the strategies.")
-                    strategy.client.close_all_positions()
+                    # self.logger.info("Close all positions as for ending the strategies.")
+                    # strategy.client.close_all_positions()
                     break
             if count % 10 == 0:
                 self.logger.debug(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")

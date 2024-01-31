@@ -22,11 +22,8 @@ def __close(client: fc.Client, symbol, state):
         position_type = "bid"
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
-    result, suc = client.close_position(symbol=symbol, order_type=position_type)
-    if suc:
-        price, position_price, price_diff, profit = result
-    else:
-        price, position_price, price_diff, profit = None, None, None, None
+    result = client.close_position(symbol=symbol, order_type=position_type)
+    price, position_price, price_diff, profit, suc = result
     return suc, (price, position_price, price_diff, profit)
 
 
