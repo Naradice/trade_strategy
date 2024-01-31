@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import random
-import sys
 
 import finance_client as fc
 import pandas as pd
@@ -173,9 +172,9 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
         sig_df = sig_df.loc[sig_sr.index]
-        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == True)]
+        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] is True)]
         # ignore symbols already have
-        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] == False)]
+        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] is False)]
         # sig_df = pd.concat([close_sig_df, sig_df], axis=0)
         signals = close_sig_df["signal"]
         states = close_sig_df["state"]
@@ -243,6 +242,7 @@ def order_by_signal_file(file_path: str, finance_client: fc.Client, mode="rating
 
 
 def __add_state_to_signal(signals, state, symbol):
+    """add state to signals file. value of state is handled separately after a client actually open a position"""
     if signals is None:
         return None
     if len(signals) > 1:
