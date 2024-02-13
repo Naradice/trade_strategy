@@ -172,9 +172,9 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
         sig_df = sig_df.loc[sig_sr.index]
-        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] is True)]
+        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == True)]
         # ignore symbols already have
-        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] is False)]
+        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] == False)]
         # sig_df = pd.concat([close_sig_df, sig_df], axis=0)
         signals = close_sig_df["signal"]
         states = close_sig_df["state"]
