@@ -90,11 +90,14 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
     RATING_KEY = "ratings"
 
     symbol_convertion = {}
+    print("determin symbols from signals: ")
     for symbol in signals.index:
+        print(symbol)
         # convert Yahoo format for JPN to common format
         new_symbol = __convert_symbol(symbol)
         symbol_convertion[new_symbol] = symbol
     symbols = list(symbol_convertion.keys())
+    print(f"add ratings for {symbols}")
 
     ratings = {}
     if RATING_KEY in existing_info:
@@ -112,7 +115,7 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
                     existing_date = datetime.datetime.fromisoformat(date)
                 except AttributeError:
                     existing_date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
-                except Exception as e:
+                except Exception:
                     print(f"can't determin update_date of {symbol}")
                     new_symbols.append(symbol)
                     continue
@@ -131,7 +134,10 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
         new_ratings_df = pd.DataFrame()
         if len(new_symbols) > 0:
             ## assume columns=["mean", "var", "amount"], index=symbols
+            print("start adding get_rating with a client for new symbols")
             new_ratings_df = client.get_rating(new_symbols)
+        else:
+            print("new symbols not found. try to use existing  rating info.")
         rating_df = pd.concat([existing_rates_df, new_ratings_df], axis=0)
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
         if len(rating_df) > 0:
@@ -163,7 +169,9 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
                 print("failed to save rating info.")
             return True, candidate_df, remaining_df
         else:
+            print("failed to get rate. ratings object has no items.")
             return False, None, None
+    print("failed to get rate since client has no such feature")
     return False, None, None
 
 
@@ -172,9 +180,9 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
         sig_df = sig_df.loc[sig_sr.index]
-        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] is True)]
+        close_sig_df = sig_df[(sig_df["state"] != 0) & (sig_df["is_close"] == True)]
         # ignore symbols already have
-        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] is False)]
+        sig_df = sig_df[(sig_df["state"] == 0) & (sig_df["is_close"] == False)]
         # sig_df = pd.concat([close_sig_df, sig_df], axis=0)
         signals = close_sig_df["signal"]
         states = close_sig_df["state"]
@@ -196,36 +204,39 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
             new_states[symbol] = 0
 
         if "state" in sig_df:
-            if mode == "rating":
-                suc, rating_df, remain_df = __add_rating(finance_client, sig_df)
-                if suc:
-                    signals = rating_df["signal"]
-                    states = rating_df["state"]
-                    print("start ordering based on ratings")
-                    for symbol in rating_df.index:
-                        signal = None
-                        try:
-                            signal = signals[symbol]
-                            state = states[symbol]
-                        except KeyError:
-                            continue
-                        if signal is not None:
-                            suc, result, result_state = __order(finance_client, symbol, signal, state)
-                            if suc:
-                                new_states[symbol] = result_state
-                    # handle remainings
-                    print("start ordering randomly")
-                    new_states_rand = __random_order(finance_client, remain_df)
-                    new_states.update(new_states_rand)
+            if len(sig_df) > 0:
+                if mode == "rating":
+                    suc, rating_df, remain_df = __add_rating(finance_client, sig_df)
+                    if suc:
+                        signals = rating_df["signal"]
+                        states = rating_df["state"]
+                        print("start ordering based on ratings")
+                        for symbol in rating_df.index:
+                            signal = None
+                            try:
+                                signal = signals[symbol]
+                                state = states[symbol]
+                            except KeyError:
+                                continue
+                            if signal is not None:
+                                suc, result, result_state = __order(finance_client, symbol, signal, state)
+                                if suc:
+                                    new_states[symbol] = result_state
+                        # handle remainings
+                        print("start ordering randomly")
+                        new_states_rand = __random_order(finance_client, remain_df)
+                        new_states.update(new_states_rand)
+                    else:
+                        print("Failed to get ratings.")
+                elif mode == "random":
+                    new_states = __random_order(finance_client, sig_df)
+                elif mode == "none" or mode is None:
+                    pass
                 else:
-                    print("Failed to get ratings.")
-            elif mode == "random":
-                new_states = __random_order(finance_client, sig_df)
-            elif mode == "none" or mode is None:
-                pass
+                    raise ValueError(f"Unkown mode {mode} is specified.")
+                return new_states
             else:
-                raise ValueError(f"Unkown mode {mode} is specified.")
-            return new_states
+                print("no signal specified to order.")
         else:
             print("unkown signal format.")
     else:
