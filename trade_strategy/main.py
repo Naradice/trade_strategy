@@ -8,14 +8,14 @@ import time
 
 from .strategies import StrategyClient
 
+
 class ParallelStrategyManager:
-    
-    def __init__(self, strategies:list, days=0, hours=0, minutes=0, seconds=0, logger = None) -> None:
+    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, logger=None) -> None:
         self.event = threading.Event()
         if logger is None:
             dir = os.path.dirname(__file__)
             try:
-                with open(os.path.join(dir, './settings.json'), 'r') as f:
+                with open(os.path.join(dir, "./settings.json"), "r") as f:
                     settings = json.load(f)
             except Exception as e:
                 self.logger.error(f"fail to load settings file on strategy main: {e}")
@@ -31,7 +31,7 @@ class ParallelStrategyManager:
             self.logger = logger
             for strategy in strategies:
                 strategy.logger = logger
-            
+
         self.results = {}
         if type(strategies) == list and len(strategies) > 0:
             self.strategies = strategies
@@ -39,7 +39,7 @@ class ParallelStrategyManager:
             for strategy in strategies:
                 self.results[strategy.key] = []
         self.done = False
-            
+
     def __start_strategy(self, strategy: StrategyClient):
         interval_mins = strategy.interval_mins
         if interval_mins > 0:
@@ -48,16 +48,16 @@ class ParallelStrategyManager:
         else:
             interval = 1
             doSleep = False
-            
+
         if doSleep:
             base_time = datetime.datetime.now()
-            target_min = datetime.timedelta(minutes=(interval_mins- base_time.minute % interval_mins))
+            target_min = datetime.timedelta(minutes=(interval_mins - base_time.minute % interval_mins))
             target_time = base_time + target_min
             sleep_time = datetime.datetime.timestamp(target_time) - datetime.datetime.timestamp(base_time) - base_time.second
             if sleep_time > 0:
                 self.logger.debug(f"wait {sleep_time} to start on frame time")
                 time.sleep(sleep_time)
-        
+
         count = 0
         buySignalCount = 0
         sellSignalCount = 0
@@ -66,7 +66,7 @@ class ParallelStrategyManager:
         symbols = strategy.client.symbols
         for symbol in symbols:
             self.results[symbol] = []
-        
+
         while datetime.datetime.now() < self.__end_time and self.done == False:
             start_time = datetime.datetime.now()
             signals = strategy.run(symbols)
@@ -90,7 +90,7 @@ class ParallelStrategyManager:
                             results = strategy.client.close_long_positions(signal.symbol)
                             if results:
                                 self.logger.info(f"long positions are closed, remaining budget is {strategy.client.wallet.budget}")
-                            
+
                         if len(results) > 0:
                             for result in results:
                                 # (price, position.price, price_diff, profit, True)
@@ -104,18 +104,38 @@ class ParallelStrategyManager:
                                     self.results[symbol].append(result[2])
                     else:
                         if signal.is_buy:
-                            position = strategy.client.open_trade(signal.is_buy, amount=signal.amount,price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}")
+                            position = strategy.client.open_trade(
+                                signal.is_buy,
+                                amount=signal.amount,
+                                price=signal.order_price,
+                                tp=signal.tp,
+                                sl=signal.sl,
+                                order_type=signal.order_type,
+                                symbol=signal.symbol,
+                            )
+                            self.logger.info(
+                                f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                            )
                             buySignalCount += 1
                         elif signal.is_buy == False:
-                            position = strategy.client.open_trade(is_buy=signal.is_buy, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, order_type=signal.order_type, symbol=signal.symbol)
-                            self.logger.info(f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}")
+                            position = strategy.client.open_trade(
+                                is_buy=signal.is_buy,
+                                amount=signal.amount,
+                                price=signal.order_price,
+                                tp=signal.tp,
+                                sl=signal.sl,
+                                order_type=signal.order_type,
+                                symbol=signal.symbol,
+                            )
+                            self.logger.info(
+                                f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                            )
                             sellSignalCount += 1
             if doSleep:
                 base_time = time.time()
                 next_time = ((base_time - time.time()) % interval) or interval
                 self.logger.debug(f"wait {sleep_time} to run on next frame")
-                #time.sleep(next_time)
+                # time.sleep(next_time)
                 if self.event.wait(timeout=next_time):
                     # self.logger.info("Close all positions as for ending the strategies.")
                     # strategy.client.close_all_positions()
@@ -124,8 +144,8 @@ class ParallelStrategyManager:
                 self.logger.debug(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
                 print(strategy.client.get_portfolio())
                 print(strategy.client.get_budget())
-            count+=1
-        
+            count += 1
+
         for symbol in symbols:
             totalSignalCount = len(self.results[symbol])
             if totalSignalCount != 0:
@@ -135,18 +155,20 @@ class ParallelStrategyManager:
                 winRevenute = sum(winList)
                 resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
                 self.logger.info(resultTxt)
-                self.logger.info(f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}")
+                self.logger.info(
+                    f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}"
+                )
                 var = statistics.pvariance(self.results[symbol])
                 mean = statistics.mean(self.results[symbol])
                 self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
                 ## TODO: add profit per year
         print(f"Storategy Ended. Frame: {strategy.client.frame}")
-                
+
     def start_strategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
         self.__end_time = self.__start_time + self.__duration
         self.done = False
-        
+
         for strategy in self.strategies:
             if strategy.client.do_render:
                 try:
@@ -163,7 +185,7 @@ class ParallelStrategyManager:
                 if wait:
                     try:
                         ui = input("Please input 'exit' to end the strategies.")
-                        if ui.lower() == 'exit':
+                        if ui.lower() == "exit":
                             self.event.set()
                             self.done = True
                             if t.is_alive():
@@ -174,12 +196,10 @@ class ParallelStrategyManager:
                         self.done = True
                         if t.is_alive():
                             exit()
-                
-        
-    
+
     def stop_strategies(self):
         self.done = True
-    
+
     def summary(self):
         totalRevenue = 0
         totalWinCount = 0

@@ -10,11 +10,8 @@ from ..signal import *
 from . import strategy
 
 
-## TODO: caliculate required length from idc_processes
-
 # Experimental. You may lose your money.
 class SlopeChange(StrategyClient):
-
     key = "slope_change"
 
     def __init__(
@@ -81,7 +78,6 @@ class WMACross(StrategyClient):
 
 
 class MACDCross(StrategyClient):
-
     key = "macd_cross"
 
     @classmethod
@@ -142,7 +138,6 @@ class MACDCross(StrategyClient):
 
 
 class MACDRenko(StrategyClient):
-
     key = "macd_renko"
 
     @classmethod
@@ -225,7 +220,6 @@ class MACDRenko(StrategyClient):
 
 
 class MACDRenkoSLByBB(MACDRenko):
-
     key = "bmacd_renko"
 
     @classmethod
@@ -328,7 +322,6 @@ class MACDRenkoSLByBB(MACDRenko):
 
 
 class CCICross(StrategyClient):
-
     key = "cci_cross"
 
     @classmethod
@@ -395,7 +388,6 @@ class CCICross(StrategyClient):
 
 
 class CCIBoader(StrategyClient):
-
     key = "cci_boader"
 
     @classmethod
@@ -475,7 +467,6 @@ class CCIBoader(StrategyClient):
 
 
 class RangeTrade(StrategyClient):
-
     key = "range"
 
     @classmethod
@@ -549,7 +540,6 @@ class RangeTrade(StrategyClient):
 
 
 class MACDRenkoRange(StrategyClient):
-
     key = "macd_ranko_range"
 
     @classmethod
@@ -653,7 +643,6 @@ class MACDRenkoRange(StrategyClient):
 
 
 class MACDRenkoRangeSLByBB(MACDRenkoRange):
-
     key = "bmacd_renkor"
 
     @classmethod
@@ -764,7 +753,6 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
 
 
 class Momentum(StrategyClient):
-
     key = "atrsma"
 
     def __init__(
@@ -785,7 +773,6 @@ class Momentum(StrategyClient):
         save_signal_info=False,
         logger=None,
     ) -> None:
-
         self.momentum_column = momentum_column
         self.short_ma_column = short_ma_column
         self.atr_column = atr_column

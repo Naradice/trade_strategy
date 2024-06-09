@@ -1,5 +1,4 @@
-PendingOrderKey = "Pending"
-MarketOrderKey = "Market"
+from finance_client.position import ORDER_TYPE
 
 
 class Trend:
@@ -55,7 +54,7 @@ class Signal:
         basic_dict = {
             "id": self.id,
             "symbol": self.symbol,
-            "order_type": self.order_type,
+            "order_type": self.order_type.value,
             "possibility": self.possibility,
             "is_buy": self.is_buy,
             "is_close": self.is_close,
@@ -101,7 +100,7 @@ class BuySignal(Signal):
         self.key = "buy"
         self.trend = LongTrend()
         self.id = 1
-        self.order_type = MarketOrderKey
+        self.order_type = ORDER_TYPE.market
         self.is_buy = True
         self.symbol = symbol
 
@@ -117,7 +116,7 @@ class SellSignal(Signal):
         self.key = "sell"
         self.id = -1
         self.trend = ShortTrend()
-        self.order_type = MarketOrderKey
+        self.order_type = ORDER_TYPE.market
         self.is_buy = False
 
 
@@ -132,7 +131,7 @@ class BuyPendingOrderSignal(Signal):
         self.key = "buy_pending"
         self.trend = LongTrend()
         self.id = 2
-        self.order_type = PendingOrderKey
+        self.order_type = "Pending"
         self.is_buy = True
 
 
@@ -147,7 +146,7 @@ class SellPendingOrderSignal(Signal):
         self.key = "sell_order"
         self.trend = ShortTrend()
         self.id = -2
-        self.order_type = PendingOrderKey
+        self.order_type = "Pending"
         self.is_buy = False
 
 
@@ -163,7 +162,7 @@ class CloseSignal(Signal):
         self.key = "close"
         self.trend = Trend()
         self.id = 10
-        self.order_type = MarketOrderKey
+        self.order_type = ORDER_TYPE.market
         self.is_buy = None
         self.is_close = True
 
@@ -181,7 +180,7 @@ class CloseBuySignal(Signal):
         self.key = "close_buy"
         self.id = 11
         self.trend = Trend()
-        self.order_type = MarketOrderKey
+        self.order_type = ORDER_TYPE.market
         self.is_buy = True
         self.is_close = True
 
@@ -199,7 +198,7 @@ class CloseSellSignal(Signal):
         self.key = "close_sell"
         self.trend = Trend()
         self.id = -11
-        self.order_type = MarketOrderKey
+        self.order_type = ORDER_TYPE.market
         self.is_buy = False
         self.is_close = True
 
@@ -223,14 +222,14 @@ class SignalInfo:
     ):
         self.trend = trend
         if is_buy:
-            if order_type == MarketOrderKey:
+            if order_type == ORDER_TYPE.market or order_type == "Market" or order_type == ORDER_TYPE.market.value:
                 self.signal = BuySignal(amount=amount, tp=tp, sl=sl, possibility=possibility)
-            elif order_type == PendingOrderKey:
+            elif order_type == "Pending":
                 self.signal = BuyPendingOrderSignal(amount=amount, price=price, tp=tp, sl=sl, possibility=possibility)
-        elif is_buy == False:
-            if order_type == MarketOrderKey:
+        elif is_buy is False:
+            if order_type == ORDER_TYPE.market or order_type == "Market" or order_type == ORDER_TYPE.market.value:
                 self.signal = SellSignal(amount=amount, tp=tp, sl=sl, possibility=possibility)
-            elif order_type == PendingOrderKey:
+            elif order_type == "Pending":
                 self.signal = SellPendingOrderSignal(price=price, tp=tp, sl=sl, possibility=possibility)
         elif type(price) == list:
             self.signal = ValueRangeSignal(pricees=price, tp=tp, sl=sl, possibilities=possibility)
