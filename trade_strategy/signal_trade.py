@@ -142,7 +142,7 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
         if len(rating_df) > 0:
             candidate_df_all = rating_df[rating_df["amount"] > amount_threthold]
-            candidate_df = candidate_df_all[candidate_df_all["mean"] > mean_threthold]
+            candidate_df = candidate_df_all[candidate_df_all["mean"] > mean_threthold].copy()
             candidate_df.sort_values(by="var", ascending=True, inplace=True)
             org_index = []
             for symbol in candidate_df.index:

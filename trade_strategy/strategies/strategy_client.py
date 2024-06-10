@@ -113,7 +113,7 @@ class MACDCross(StrategyClient):
         if macd_process is None:
             macd = fc.fprocess.MACDProcess()
         else:
-            if macd.kinds == "MACD":
+            if macd_process.kinds == "MACD":
                 macd = macd_process
             else:
                 raise Exception("MACDCross accept only MACDProcess")
@@ -686,6 +686,9 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         data_length=250,
         threshold=2,
         logger=None,
+        bolinger_threshold=None,
+        rsi_column=None,
+        rsi_threshold=None,
     ) -> None:
         """
         add condition to open a position by Bolinger Band
@@ -700,16 +703,28 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
             data_length (int, optional): Length to caliculate the indicaters. Defaults to 250.
             logger (optional): You can pass your logger. Defaults to None.
+            bolinger_threshold (float) : threthold to return None based on bolinger std with alpha=1. Specify multiply value of std, defaults to None
+            rsi_column (str): column to determin current rsi for threshold,
+            rsi_threshold (float): threthold to return None based on rsi. Specify a boader value, defaults to None
         """
 
-        ##initialize required columns
+        # initialize required columns
         self.bolinger_columns = bolinger_process.columns
         self.b_option = bolinger_process.option
         self.b_alpha = self.b_option["alpha"]
         if range_process is None or range_process.kinds != fc.fprocess.RangeTrendProcess.kinds:
             range_process = fc.fprocess.RangeTrendProcess()
-        ## add BBANDPreProcess
-        ##check if bolinger_process is an instannce of BBANDpreProcess
+        self.bolinger_threshold = bolinger_threshold
+        self.rsi_threshold = rsi_threshold
+        if rsi_threshold is not None:
+            if rsi_column is None:
+                rsi_p = fc.fprocess.RSIProcess()
+                self.add_indicaters([rsi_p])
+                rsi_column = rsi_p.KEY_RSI
+        self.rsi_column = rsi_column
+
+        # add BBANDPreProcess
+        # check if bolinger_process is an instannce of BBANDpreProcess
         super().__init__(
             finance_client,
             renko_process,
@@ -748,6 +763,9 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             self.threshold,
             self.close_column_name,
             self.use_tp,
+            bolinger_threshold=self.bolinger_threshold,
+            rsi_column=self.rsi_column,
+            rsi_threshold=self.rsi_threshold,
         )
         return signal
 

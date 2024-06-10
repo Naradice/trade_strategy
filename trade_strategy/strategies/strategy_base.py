@@ -3,11 +3,10 @@ from ..signal import Signal
 import pandas as pd
 from logging import getLogger, config
 import json, os
-from trade_strategy.signal import Signal, Trend
+from trade_strategy.signal import Signal
 
 
 class StrategyClient:
-
     key = "base"
     client: fc.Client = None
 
@@ -15,7 +14,7 @@ class StrategyClient:
         self,
         financre_client: fc.Client,
         idc_processes=[],
-        interval_mins: int = -1,
+        interval_mins: int = None,
         amount=1,
         data_length: int = 100,
         save_signal_info=False,
@@ -46,7 +45,7 @@ class StrategyClient:
         self.amount = amount
         self.client = financre_client
         self.data_length = data_length
-        if interval_mins < 0:
+        if interval_mins is None:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins

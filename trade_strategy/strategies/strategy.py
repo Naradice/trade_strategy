@@ -24,13 +24,12 @@ def slope_change(
 ):
     key = "slope_change"
     slope_srs = df[slope_column].iloc[-slope_length:]
-    #pre_slope_value = slope_srs.iloc[-6:-1].mean()
+    # pre_slope_value = slope_srs.iloc[-6:-1].mean()
     last_slope_value = slope_srs.iloc[-3:].mean()
     signal = None
     # momentum = df[short_ema_column].iloc[-1] - df[long_ema_column].iloc[-1]
     trend_possibility = df[bb_width_column].iloc[-1]
     # print(trend_possibility, pre_slope_value, " -> ", last_slope_value, df[rsi_column].iloc[-1])
-    
 
     if position == 0:
         if last_slope_value > slope_threshold and rsi_threshold > df[rsi_column].iloc[-1]:
@@ -90,7 +89,7 @@ def slope_change(
                 elif last_slope_value < -slope_threshold:
                     print(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
-                
+
     return signal, in_range
 
 
@@ -382,6 +381,7 @@ def macd_renko_range_ex(
     __is_in_range = is_in_range
     long_short = position
     signal = None
+
     if len(df) > 0:
         rp = df[range_possibility_column].iloc[-1]
         last_df = df.iloc[-1]
@@ -394,12 +394,10 @@ def macd_renko_range_ex(
             ):
                 if rp <= 0.65:
                     signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = 1
                     __is_in_range = False
                 else:
                     __is_in_range = True
                     signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = -1
             elif (
                 renko_cont_num <= -threadh_hold
                 and last_df[macd_column_column] < last_df[macd_signal_column]
@@ -407,11 +405,9 @@ def macd_renko_range_ex(
             ):
                 if rp <= 0.65:
                     signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = -1
                     __is_in_range = False
                 else:
                     signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = 1
                     __is_in_range = True
 
         elif long_short == 1:
@@ -425,10 +421,8 @@ def macd_renko_range_ex(
                     and last_df[slope_macd_column] < last_df[slope_signal_column]
                 ):
                     signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = -1
                 elif last_df[macd_column_column] < last_df[macd_signal_column] and last_df[slope_macd_column] < last_df[slope_signal_column]:
                     signal = CloseSignal(std_name=key)
-                    trend = 0
             if rp <= 0.65:
                 __is_in_range = False
 
@@ -443,10 +437,8 @@ def macd_renko_range_ex(
                     and last_df[slope_macd_column] > last_df[slope_signal_column]
                 ):
                     signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-                    trend = 1
                 elif last_df[macd_column_column] > last_df[macd_signal_column] and last_df[slope_macd_column] > last_df[slope_signal_column]:
                     signal = CloseSignal(std_name=key)
-                    trend = 0
             if rp <= 0.65:
                 __is_in_range = False
     return signal, __is_in_range
@@ -471,8 +463,33 @@ def macd_renkorange_bb_ex(
     threshold=2,
     order_price_column="Close",
     use_tp=False,
+    bolinger_threshold=None,
+    rsi_column=None,
+    rsi_threshold=None,
 ):
-    key = "bmacd_renkorange_ex"
+    signal = None
+    __is_in_range = is_in_range
+
+    if position == 0:
+        if bolinger_threshold is not None:
+            width = df[widh_column].iloc[-1]
+            std = width / (b_alpha * 2)
+            mean_value = df[high_column].iloc[-1] - std * b_alpha
+            current_price = df[order_price_column].iloc[-1]
+            upper_price = mean_value + std * bolinger_threshold
+            if current_price >= upper_price:
+                return signal, __is_in_range
+            else:
+                lower_price = mean_value - std * bolinger_threshold
+                if current_price <= lower_price:
+                    return signal, __is_in_range
+
+        if rsi_threshold is not None:
+            if rsi_column is not None:
+                rsi_value = df[rsi_column].iloc[-1].abs()
+                if rsi_value >= rsi_threshold:
+                    return signal, __is_in_range
+
     signal, __is_in_range = macd_renko_range_ex(
         position,
         df,
