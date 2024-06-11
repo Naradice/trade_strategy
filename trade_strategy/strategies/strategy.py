@@ -200,7 +200,7 @@ def macd_renko_bb(
         position, df, renko_bnum_column, macd_column_column, macd_signal_column, slope_macd_column, slope_signal_column, order_price_column
     )
 
-    # if signal is raised, check values for stop loss
+    # if signal is rose, check values for stop loss
     if signal is not None:
         # check bolinger band range
         if signal.is_buy is True:
@@ -217,7 +217,7 @@ def macd_renko_bb(
                 print("don't add the sl as current value is too low")
 
         elif signal.is_buy is False:  # sell case
-            print("sell signal is raised. Start adding a sl")
+            print("sell signal is rose. Start adding a sl")
             current_rate = bid_value
             mean_value = df.iloc[-1][mean_value_column]
             upper_value = df.iloc[-1][upper_value_column]
@@ -275,9 +275,9 @@ def cci_boader(position, df: pd.DataFrame, cci_column_name, order_price_column, 
         if long_short != 1:
             if current_cci >= upper_boader:
                 if current_cci >= upper_boader * 2:
-                    print(f"Buy signal is not raised as cci is too high {current_cci}")
+                    print(f"Buy signal is not rose as cci is too high {current_cci}")
                 else:
-                    print(f"Buy signal is raised as cci over {upper_boader}: {current_cci}")
+                    print(f"Buy signal is rose as cci over {upper_boader}: {current_cci}")
                     signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
                 trend = 1
             elif lower_boader < current_cci:
@@ -287,9 +287,9 @@ def cci_boader(position, df: pd.DataFrame, cci_column_name, order_price_column, 
         elif long_short != -1:
             if current_cci <= lower_boader:
                 if current_cci <= lower_boader * 2:
-                    print(f"Sell signal is not raised as cci is too low {current_cci}")
+                    print(f"Sell signal is not rose as cci is too low {current_cci}")
                 else:
-                    print(f"Buy signal is raised as cci over -100: {current_cci}")
+                    print(f"Buy signal is rose as cci over -100: {current_cci}")
                     signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif upper_boader > current_cci:
                 if long_short == 1:
@@ -508,7 +508,7 @@ def macd_renkorange_bb_ex(
         order_price_column,
     )
 
-    # if signal is raised, check values for stop loss
+    # if signal is rose, check values for stop loss
     if signal is not None:
         # check bolinger band range
         width = df[widh_column].iloc[-1]

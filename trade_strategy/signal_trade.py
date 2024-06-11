@@ -257,7 +257,7 @@ def __add_state_to_signal(signals, state, symbol):
     if signals is None:
         return None
     if len(signals) > 1:
-        print("signal raised two or more somehow.")
+        print("signal rose two or more somehow.")
         return None
     elif len(signals) > 0:
         signal = signals[0]
