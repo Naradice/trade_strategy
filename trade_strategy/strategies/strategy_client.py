@@ -170,6 +170,8 @@ class MACDRenko(StrategyClient):
         data_length=250,
         threshold=2,
         logger=None,
+        bolinger_threshold=None,
+        rsi_threshold=None,
     ) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
 
@@ -204,7 +206,43 @@ class MACDRenko(StrategyClient):
         indicaters = [renko_process, macd_process, macd_slope, signal_slope]
         self.add_indicaters(indicaters)
 
+        self.bolinger_threshold = bolinger_threshold
+        if bolinger_threshold is not None:
+            ohlc_dict = finance_client.get_ohlc_columns()
+            b_process = fc.fprocess.BBANDProcess(alpha=bolinger_threshold, target_column=ohlc_dict["Close"])
+            self.add_indicaters([b_process])
+            self.bh_column = b_process.KEY_UPPER_VALUE
+            self.bl_column = b_process.KEY_LOWER_VALUE
+            self.order_price_column = ohlc_dict["Close"]
+        self.rsi_threshold = rsi_threshold
+        if rsi_threshold is not None:
+            ohlc_dict = finance_client.get_ohlc_columns()
+            rsi_p = fc.fprocess.RSIProcess(ohlc_column_name=list(ohlc_dict.values()))
+            self.add_indicaters([rsi_p])
+            rsi_column = rsi_p.KEY_RSI
+            self.rsi_column = rsi_column
+
     def get_signal(self, df: pd.DataFrame, position, symbol: str):
+        
+        if position == 0:
+            if self.bolinger_threshold is not None:
+                current_price = df[self.order_price_column].iloc[-1]
+                upper_price = df[self.bh_column].iloc[-1]
+                if current_price >= upper_price:
+                    return None
+                else:
+                    lower_price = df[self.bl_column].iloc[-1]
+                    if current_price <= lower_price:
+                        return None
+
+            if self.rsi_threshold is not None:
+                if self.rsi_column is not None:
+                    rsi_value = abs(df[self.rsi_column].iloc[-1])
+                    if rsi_value >= self.rsi_threshold[0]:
+                        return None
+                    elif rsi_value <= self.rsi_threshold[1]:
+                        return None
+                    
         signal = strategy.macd_renko(
             position,
             df,
@@ -256,7 +294,6 @@ class MACDRenkoSLByBB(MACDRenko):
         slope_window=5,
         amount=1,
         use_tp=False,
-        continuous=False,
         interval_mins: int = -1,
         data_length=250,
         logger=None,
@@ -281,14 +318,15 @@ class MACDRenkoSLByBB(MACDRenko):
             renko_process=renko_process,
             macd_process=macd_process,
             slope_window=slope_window,
-            continuous=continuous,
             interval_mins=interval_mins,
             amount=amount,
             data_length=data_length,
             logger=logger,
         )
 
-        ##initialize required columns
+        self.add_indicaters([bolinger_process])
+
+        # initialize required columns
         self.bolinger_columns = {
             "LV": bolinger_process.KEY_LOWER_VALUE,
             "MV": bolinger_process.KEY_MEAN_VALUE,
@@ -573,6 +611,7 @@ class MACDRenkoRange(StrategyClient):
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
         range_process: fc.fprocess.RangeTrendProcess,
+        bolinger_process=None,
         slope_window=5,
         alpha=2,
         amount=1,
@@ -604,7 +643,10 @@ class MACDRenkoRange(StrategyClient):
 
         if range_process is None or range_process.kinds != fc.fprocess.RangeTrendProcess.kinds:
             range_process = fc.fprocess.RangeTrendProcess()
-        bband_process = fc.fprocess.BBANDProcess(target_column=self.close_column_name, alpha=alpha)
+        if bolinger_process is None:
+            bband_process = fc.fprocess.BBANDProcess(target_column=self.close_column_name, alpha=alpha)
+        else:
+            bband_process = bolinger_process
         self.alpha = alpha
         self.macd_column_column = macd_process.KEY_MACD
         self.macd_signal_column = macd_process.KEY_SIGNAL
@@ -680,6 +722,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         bolinger_process: fc.fprocess.BBANDProcess,
         range_process=None,
         slope_window=5,
+        alpha=2,
         amount=1,
         use_tp=False,
         interval_mins: int = -1,
@@ -710,8 +753,6 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
 
         # initialize required columns
         self.bolinger_columns = bolinger_process.columns
-        self.b_option = bolinger_process.option
-        self.b_alpha = self.b_option["alpha"]
         if range_process is None or range_process.kinds != fc.fprocess.RangeTrendProcess.kinds:
             range_process = fc.fprocess.RangeTrendProcess()
         self.bolinger_threshold = bolinger_threshold
@@ -730,13 +771,14 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             renko_process,
             macd_process,
             range_process,
-            slope_window,
-            self.b_alpha,
-            amount,
-            interval_mins,
-            data_length,
-            threshold,
-            logger,
+            bolinger_process=bolinger_process,
+            slope_window=slope_window,
+            alpha=alpha,
+            amount=amount,
+            interval_mins=interval_mins,
+            data_length=data_length,
+            threshold=threshold,
+            logger=logger,
         )
 
         self.use_tp = use_tp
