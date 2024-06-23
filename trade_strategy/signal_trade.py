@@ -21,7 +21,7 @@ def __close(client: fc.Client, symbol, state):
         position_type = "bid"
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
-    result = client.close_position(symbol=symbol, order_type=position_type)
+    result = client.close_position(symbol=symbol, position_type=position_type)
     price, position_price, price_diff, profit, suc = result
     return suc, (price, position_price, price_diff, profit)
 
@@ -30,11 +30,11 @@ def __order(client: fc.Client, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
     if signal == "buy" and state == 0:
         print(f"buy order: {symbol}")
-        suc, result = client.open_trade(is_buy=True, amount=1, order_type="Market", symbol=symbol)
+        suc, result = client.open_trade(is_buy=True, amount=1, order_type=0, symbol=symbol)
         return suc, result, 1
     elif signal == "sell" and state == 0:
         print(f"sell order: {symbol}")
-        suc, result = client.open_trade(is_buy=False, amount=1, order_type="Market", symbol=symbol)
+        suc, result = client.open_trade(is_buy=False, amount=1, order_type=0, symbol=symbol)
         return suc, result, -1
     elif "close" in signal:
         print(f"close order: {symbol}")
