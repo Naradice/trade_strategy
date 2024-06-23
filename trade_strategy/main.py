@@ -76,7 +76,7 @@ class ParallelStrategyManager:
             for index, signal in enumerate(signals):
                 if signal and signal.order_type is not None:
                     if signal.is_close:
-                        self.logger.info(f"close signal is raised. {signal}")
+                        self.logger.info(f"close signal is rose: {signal}")
                         results = []
                         if signal.is_buy is None:
                             results = strategy.client.close_all_positions(signal.symbol)
@@ -157,7 +157,7 @@ class ParallelStrategyManager:
                 resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
                 self.logger.info(resultTxt)
                 self.logger.info(
-                    f"buy signal raised:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}"
+                    f"buy signal rose:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}"
                 )
                 var = statistics.pvariance(self.results[symbol])
                 mean = statistics.mean(self.results[symbol])
