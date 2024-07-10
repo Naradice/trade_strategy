@@ -28,3 +28,5 @@ env.json
 venv*/
 back_test/*_mt5*
 !.vscode/settings.json
+back_test/*.db
+back_test/*.ipynb
