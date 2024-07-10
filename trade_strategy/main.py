@@ -73,7 +73,7 @@ class ParallelStrategyManager:
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
-            for signal in signals:
+            for index, signal in enumerate(signals):
                 if signal and signal.order_type is not None:
                     if signal.is_close:
                         self.logger.info(f"close signal is rose: {signal}")
@@ -98,10 +98,11 @@ class ParallelStrategyManager:
                                     if result[-1]:
                                         self.logger.info(f"closed result: {result}")
                                         closedCount += 1
+                                        self.results[symbol].append(result[2])
                                     else:
                                         self.logger.info(f"pending closed result: {result}")
                                         closedByPendingCount += 1
-                                    self.results[symbol].append(result[2])
+                                        self.results[symbol].append(result[0][2])
                     else:
                         if signal.is_buy:
                             position = strategy.client.open_trade(
@@ -117,7 +118,7 @@ class ParallelStrategyManager:
                                 f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
                             )
                             buySignalCount += 1
-                        elif signal.is_buy == False:
+                        elif signal.is_buy is False:
                             position = strategy.client.open_trade(
                                 is_buy=signal.is_buy,
                                 amount=signal.amount,
