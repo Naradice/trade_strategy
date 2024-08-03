@@ -1,8 +1,10 @@
+import json
+import os
+
 import finance_client as fc
+
 from ..signal import Signal
-import pandas as pd
 from logging import getLogger, config
-import json, os
 from trade_strategy.signal import Signal
 
 
@@ -13,7 +15,7 @@ class StrategyClient:
     def __init__(
         self,
         financre_client: fc.Client,
-        idc_processes=[],
+        idc_processes=...,
         interval_mins: int = None,
         amount=1,
         data_length: int = 100,
@@ -66,7 +68,7 @@ class StrategyClient:
         if signal is not None:
             self.trend[signal.symbol] = signal.trend
 
-    def get_signal(self, df, long_short: int = None, symbols=[]) -> Signal:
+    def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
         return None
 
@@ -101,7 +103,7 @@ class StrategyClient:
             else:
                 position = long_short
             ohlc_df = get_dataframe(df, symbol)
-            if ohlc_df.iloc[-1].isnull().any() == True:
+            if ohlc_df.iloc[-1].isnull().any() is True:
                 print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
             signal = self.get_signal(ohlc_df, position, symbol)
             if signal is not None:

@@ -63,11 +63,12 @@ class ParallelStrategyManager:
         sellSignalCount = 0
         closedCount = 0
         closedByPendingCount = 0
-        symbols = strategy.client.symbols
+        symbols = strategy.client.symbols.copy()
         for symbol in symbols:
             self.results[symbol] = []
 
         while datetime.datetime.now() < self.__end_time and self.done is False:
+            symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
             signals = strategy.run(symbols)
             end_time = datetime.datetime.now()
@@ -76,7 +77,7 @@ class ParallelStrategyManager:
             for index, signal in enumerate(signals):
                 if signal and signal.order_type is not None:
                     if signal.is_close:
-                        self.logger.info(f"close signal is rose: {signal}")
+                        self.logger.info(f"close signal is risen: {signal}")
                         results = []
                         if signal.is_buy is None:
                             results = strategy.client.close_all_positions(signal.symbol)
@@ -103,7 +104,7 @@ class ParallelStrategyManager:
                                         self.logger.info(f"pending closed result: {result}")
                                         closedByPendingCount += 1
                                         self.results[symbol].append(result[0][2])
-                    else:
+                    if signal.id != 10:
                         if signal.is_buy:
                             position = strategy.client.open_trade(
                                 signal.is_buy,
@@ -176,6 +177,7 @@ class ParallelStrategyManager:
                     self.__start_strategy(strategy)
                 except KeyboardInterrupt:
                     self.logger.info("Finish the strategies as KeyboardInterrupt happened")
+                    self.summary()
                     self.event.set()
                     self.done = True
                     exit()
