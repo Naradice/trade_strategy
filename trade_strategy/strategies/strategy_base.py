@@ -5,7 +5,6 @@ import finance_client as fc
 
 from ..signal import Signal
 from logging import getLogger, config
-from trade_strategy.signal import Signal
 
 
 class StrategyClient:
@@ -42,7 +41,7 @@ class StrategyClient:
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
-        self.__idc_processes = idc_processes
+        self._idc_processes = idc_processes
         self.save_signal_info = save_signal_info
         self.amount = amount
         self.client = financre_client
@@ -55,8 +54,8 @@ class StrategyClient:
 
     def add_indicaters(self, idc_processes: list):
         for process in idc_processes:
-            if process not in self.__idc_processes:
-                self.__idc_processes.append(process)
+            if process not in self._idc_processes:
+                self._idc_processes.append(process)
             else:
                 self.logger.info(f"{process.kinds} is already added")
 
@@ -68,24 +67,28 @@ class StrategyClient:
         if signal is not None:
             self.trend[signal.symbol] = signal.trend
 
-    def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
+    def get_signal(self, df, position: int = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
         return None
 
-    def run(self, symbols: str or list, long_short=None) -> Signal:
+    def get_observation(self, symbols):
+        try:
+            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self._idc_processes)
+            return df
+        except Exception as e:
+            self.logger.error(f"error occured when client gets ohlc data: {e}")
+        return []
+
+    def run(self, symbols: str or list, position=None) -> Signal:
         """run this strategy
 
         Args:
-            long_short (int, optional): represents the trend. When manually or other strategy buy/sell, you can pass 1/-1 to this strategy. Defaults to None.
+            position (int, optional): represents the trend. When manually or other strategy buy/sell, you can pass 1/-1 to this strategy. Defaults to None.
 
         Returns:
             Signal: Signal of this strategy
         """
-        try:
-            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
-        except Exception as e:
-            self.logger.error(f"error occured when client gets ohlc data: {e}")
-            return []
+        df = self.get_observation()
         signals = []
         if type(symbols) is str:
             symbols = [symbols]
@@ -95,13 +98,13 @@ class StrategyClient:
             get_dataframe = lambda df, key: df[key]
 
         for symbol in symbols:
-            if long_short is None:
+            if position is None:
                 if symbol in self.trend:
                     position = self.trend[symbol].id
                 else:
                     position = 0
             else:
-                position = long_short
+                position = position
             ohlc_df = get_dataframe(df, symbol)
             if ohlc_df.iloc[-1].isnull().any() is True:
                 print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
@@ -121,7 +124,7 @@ class MultiSymbolStrategyClient(StrategyClient):
     def __init__(
         self,
         financre_client: fc.Client,
-        idc_processes=[],
+        idc_processes=...,
         interval_mins: int = -1,
         amount=1,
         data_length: int = 100,

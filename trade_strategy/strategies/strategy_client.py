@@ -1,5 +1,3 @@
-import json
-
 import finance_client as fc
 import pandas as pd
 
@@ -109,7 +107,7 @@ class MACDCross(StrategyClient):
             data_length (int, optional): length to caliculate the MACD. Defaults to 100.
             macd_process (Process, optional): You can specify specific parameter of MACD Process. Defaults to None.
         """
-        super().__init__(finance_client, [], interval_mins, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, data_length=data_length, logger=logger)
         if macd_process is None:
             macd = fc.fprocess.MACDProcess()
         else:
@@ -223,7 +221,6 @@ class MACDRenko(StrategyClient):
             self.rsi_column = rsi_column
 
     def get_signal(self, df: pd.DataFrame, position, symbol: str):
-        
         if position == 0:
             if self.bolinger_threshold is not None:
                 current_price = df[self.order_price_column].iloc[-1]
@@ -242,7 +239,7 @@ class MACDRenko(StrategyClient):
                         return None
                     elif rsi_value <= self.rsi_threshold[1]:
                         return None
-                    
+
         signal = strategy.macd_renko(
             position,
             df,
