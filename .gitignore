@@ -18,6 +18,7 @@ __pycache__/
 *.logs
 *.log
 *.json
+*.db
 tests/mt5*
 tests/env.test.json
 tests/cc_*
@@ -28,6 +29,5 @@ env.json
 venv*/
 back_test/*_mt5*
 !.vscode/settings.json
-back_test/*.db
 back_test/*stg*.py
 back_test/*.ipynb
