@@ -98,7 +98,7 @@ def macd_cross(position, previouse_trend, data, target_column="Close", signal_co
 
     def __get_macd_trend(data: pd.DataFrame, target_column, signal_column_name, macd_column_name):
         # 1:long, -1:short
-        if type(data) != type(None) and signal_column_name in data:
+        if data is not None and signal_column_name in data:
             signal = data[signal_column_name].iloc[-1]
             macd = data[macd_column_name].iloc[-1]
             if macd >= signal:
