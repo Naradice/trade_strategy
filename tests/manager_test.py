@@ -48,28 +48,28 @@ class Test(unittest.TestCase):
     #     slept_seconds = int(slept_seconds)
     #     self.assertEqual(expected_sleep_seconds, slept_seconds)
 
-    def test_no_interval_min(self):
-        storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
-        client = CSVClient(files=file_path, frame=1, storage=storage)
-        st1 = ts.StrategyClient(client, interval_mins=-1)
-        manager = ts.StrategyManager(
-            start_date=datetime.datetime.now(), end_date=datetime.datetime.now() + datetime.timedelta(seconds=10), log_level=DEBUG
-        )
-        # manually confirm if strategy end on end_date
-        manager.start(st1)
-
-    # def test_parallel_timer(self):
+    # def test_no_interval_min(self):
     #     storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
-    #     client = CSVClient(file_paths, frame=3, storage=storage)
-    #     strategy1 = ts.StrategyClient(client, interval_mins=1)
-    #     strategy2 = ts.StrategyClient(client, interval_mins=2)
-    #     strategy3 = ts.StrategyClient(client, interval_mins=3)
-    #     sts = [strategy1, strategy2, strategy3]
-    #     manager = ts.ParallelStrategyManager(
-    #         start_date=datetime.datetime.now(), end_date=datetime.datetime.now() + datetime.timedelta(seconds=60 * 5)
+    #     client = CSVClient(files=file_path, frame=1, storage=storage)
+    #     st1 = ts.StrategyClient(client, interval_mins=-1)
+    #     manager = ts.StrategyManager(
+    #         start_date=datetime.datetime.now(), end_date=datetime.datetime.now() + datetime.timedelta(seconds=30), log_level=DEBUG
     #     )
-    #     manager.start(sts)
-    #     time.sleep(60 * 5)
+    #     # manually confirm if strategy end on end_date
+    #     manager.start(st1)
+
+    def test_parallel_timer(self):
+        storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
+        client = CSVClient(file_path, frame=1, storage=storage)
+        strategy1 = ts.StrategyClient(client, interval_mins=1)
+        strategy2 = ts.StrategyClient(client, interval_mins=2)
+        strategy3 = ts.StrategyClient(client, interval_mins=3)
+        sts = [strategy1, strategy2, strategy3]
+        manager = ts.ParallelStrategyManager(
+            start_date=datetime.datetime.now(), end_date=datetime.datetime.now() + datetime.timedelta(seconds=60 * 5), log_level=DEBUG
+        )
+        manager.start(sts)
+        time.sleep(60 * 5)
 
     # def test_MACDCross_Registration(self):
     #     storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
