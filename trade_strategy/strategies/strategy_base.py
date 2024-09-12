@@ -41,7 +41,11 @@ class StrategyClient:
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
-        self._idc_processes = idc_processes
+
+        if hasattr(idc_processes, "len"):
+            self._idc_processes = idc_processes
+        else:
+            self._idc_processes = None
         self.save_signal_info = save_signal_info
         self.amount = amount
         self.client = financre_client
@@ -68,7 +72,7 @@ class StrategyClient:
             self.trend[signal.symbol] = signal.trend
 
     def get_signal(self, df, position: int = None, symbols=...) -> Signal:
-        print("please overwrite this method on an actual client.")
+        self.logger.debug("please overwrite this method on an actual client.")
         return None
 
     def get_observation(self, symbols):
@@ -77,6 +81,7 @@ class StrategyClient:
             return df
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
+            self.logger.debug(f"{self.data_length}, {symbols}, {self._idc_processes}")
         return []
 
     def run(self, symbols: str or list, position=None) -> Signal:
@@ -88,7 +93,7 @@ class StrategyClient:
         Returns:
             Signal: Signal of this strategy
         """
-        df = self.get_observation()
+        df = self.get_observation(symbols)
         signals = []
         if type(symbols) is str:
             symbols = [symbols]
@@ -105,9 +110,8 @@ class StrategyClient:
                     position = 0
             else:
                 position = position
+            self.logger.debug(f"get data for a {symbol}")
             ohlc_df = get_dataframe(df, symbol)
-            if ohlc_df.iloc[-1].isnull().any() is True:
-                print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
             signal = self.get_signal(ohlc_df, position, symbol)
             if signal is not None:
                 signal.amount = self.amount

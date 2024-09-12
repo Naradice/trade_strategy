@@ -1,225 +1,282 @@
 import datetime
-from logging import getLogger, config
-import json
-import os
+import multiprocessing
+import signal
 import statistics
 import threading
 import time
+from logging import INFO
+from typing import Any
+
+from trade_strategy.strategies import StrategyClient
 
 from .strategies import StrategyClient
+from .console import Console, Command
 
 
-class ParallelStrategyManager:
-    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, logger=None) -> None:
-        self.event = threading.Event()
-        if logger is None:
-            dir = os.path.dirname(__file__)
-            try:
-                with open(os.path.join(dir, "./settings.json"), "r") as f:
-                    settings = json.load(f)
-            except Exception as e:
-                self.logger.error(f"fail to load settings file on strategy main: {e}")
-                raise e
-            logger_config = settings["log"]
-            try:
-                config.dictConfig(logger_config)
-            except Exception as e:
-                self.logger.error(f"fail to set configure file on strategy main: {e}")
-                raise e
-            self.logger = getLogger(__name__)
-        else:
-            self.logger = logger
-            for strategy in strategies:
-                strategy.logger = logger
-
-        self.results = {}
-        if type(strategies) == list and len(strategies) > 0:
-            self.strategies = strategies
-            self.__duration = datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-            for strategy in strategies:
-                self.results[strategy.key] = []
+class Timer:
+    def __init__(self, start_date: datetime.datetime, end_date: datetime.datetime, logger) -> None:
+        self.start_date = start_date
+        self.end_date = end_date
         self.done = False
+        self.is_timer_running = False
+        self.logger = logger
 
-    def __start_strategy(self, strategy: StrategyClient):
-        interval_mins = strategy.interval_mins
-        if interval_mins > 0:
-            interval = interval_mins * 60
-            do_sleep = True
+    def _sleep(self, secs: float):
+        if secs < 0:
+            return None
+        sleep_unit = 10
+        sleep_counts = secs // sleep_unit
+        sleep_sec = secs % sleep_unit
+        time.sleep(sleep_sec)
+        while sleep_counts > 0 and self.done is False:
+            time.sleep(sleep_unit)
+            sleep_counts -= 1
+
+    def __timer_sleep(self, event, pipe, update_frame):
+        while datetime.datetime.now() < self.end_date and self.done is False:
+            self.logger.debug(f"{datetime.datetime.now()} < {self.end_date}")
+            if update_frame is not None:
+                self._sleep(update_frame)
+                try:
+                    event.set()
+                except Exception as e:
+                    self.logger.debug(f"failed to fire timer event: {e}")
+            else:
+                delta = self.end_date - datetime.datetime.now()
+                self._sleep(delta.total_seconds())
+        try:
+            pipe.send(Command.end)
+        except Exception:
+            pass
+
+    def __wait_until_start_date(self):
+        delta = self.start_date - datetime.datetime.now()
+        delta_seconds = delta.total_seconds()
+        if delta_seconds > 0:
+            if delta_seconds < 60:
+                self.logger.info(f"sleep {delta_seconds} seconds")
+            else:
+                self.logger.info(f"sleep {delta_seconds/60} mins")
+            self._sleep(delta_seconds)
+
+    def __call__(self, timer_event, pipe, update_frame_minutes) -> Any:
+        # convert minutes to seconds
+        if update_frame_minutes is None:
+            update_frame = None
+        elif update_frame_minutes < 0:
+            update_frame = update_frame_minutes
         else:
-            interval = 1
-            do_sleep = False
+            update_frame = update_frame_minutes * 60
+        if self.is_timer_running is False:
+            t = threading.Thread(target=self.__wait_until_start_date, daemon=False)
+            t.start()
+            t.join()
+            t = threading.Thread(target=self.__timer_sleep, args=(timer_event, pipe, update_frame), daemon=False)
+            t.start()
+            self.is_timer_running = True
 
-        if do_sleep:
-            base_time = datetime.datetime.now()
-            target_min = datetime.timedelta(minutes=(interval_mins - base_time.minute % interval_mins))
-            target_time = base_time + target_min
-            sleep_time = datetime.datetime.timestamp(target_time) - datetime.datetime.timestamp(base_time) - base_time.second
-            if sleep_time > 0:
-                self.logger.debug(f"wait {sleep_time} to start on frame time")
-                time.sleep(sleep_time)
+    def sleep(self, seconds):
+        try:
+            self._sleep(seconds)
+        except KeyboardInterrupt:
+            pass
 
-        count = 0
-        buySignalCount = 0
-        sellSignalCount = 0
-        closedCount = 0
-        closedByPendingCount = 0
+
+class StrategyManager:
+    def __init__(self, start_date, end_date, logger=None, log_level=INFO) -> None:
+        self.logger = Console(logger=logger, log_level=log_level)
+        self.stop_event = threading.Event()
+        self.timer = Timer(start_date=start_date, end_date=end_date, logger=self.logger)
+        self.enable_long = True
+        self.enable_short = True
+
+    def _summary(self, results: dict):
+        for symbol, values in results.items():
+            totalSignalCount = len(values)
+            if totalSignalCount > 0:
+                revenue = sum(values)
+                winList = list(filter(lambda x: x >= 0, values))
+                winCount = len(winList)
+                winRevenute = sum(winList)
+                self.logger.info(
+                    f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+                )
+                var = statistics.pvariance(values)
+                mean = statistics.mean(values)
+                self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
+
+    def _handle_signal(self, strategy, signal):
+        if signal and signal.order_type is not None:
+            position = None
+            close_results = []
+            if signal.is_close:
+                self.logger.info(f"close signal is risen: {signal}")
+                if signal.is_buy is None:
+                    close_results = strategy.client.close_all_positions(signal.symbol)
+                    if close_results:
+                        self.logger.info(f"positions are closed, remaining budget is {strategy.client.wallet.budget}")
+                elif signal.is_buy is True:
+                    close_results = strategy.client.close_short_positions(signal.symbol)
+                    if close_results:
+                        self.logger.info(f"short positions are closed, remaining budget is {strategy.client.wallet.budget}")
+                elif signal.is_buy is False:
+                    close_results = strategy.client.close_long_positions(signal.symbol)
+                    if close_results:
+                        self.logger.info(f"long positions are closed, remaining budget is {strategy.client.wallet.budget}")
+            # if signal is close_buy/sell, buy operation should be handled after close
+            if signal.id != 10:
+                if signal.is_buy:
+                    position = strategy.client.open_trade(
+                        signal.is_buy,
+                        amount=signal.amount,
+                        price=signal.order_price,
+                        tp=signal.tp,
+                        sl=signal.sl,
+                        order_type=signal.order_type,
+                        symbol=signal.symbol,
+                    )
+                    self.logger.info(
+                        f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                    )
+                elif signal.is_buy is False:
+                    position = strategy.client.open_trade(
+                        is_buy=signal.is_buy,
+                        amount=signal.amount,
+                        price=signal.order_price,
+                        tp=signal.tp,
+                        sl=signal.sl,
+                        order_type=signal.order_type,
+                        symbol=signal.symbol,
+                    )
+                    self.logger.info(
+                        f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                    )
+            return position, close_results
+
+    def _start_strategy(self, strategy: StrategyClient, count=-1):
+        self.logger.info("started strategy")
+        results = {}
         symbols = strategy.client.symbols.copy()
         for symbol in symbols:
-            self.results[symbol] = []
+            results[symbol] = []
 
-        while datetime.datetime.now() < self.__end_time and self.done is False:
+        if self.stop_event.is_set() is False:
             symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
             signals = strategy.run(symbols)
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
-            for index, signal in enumerate(signals):
-                if signal and signal.order_type is not None:
-                    if signal.is_close:
-                        self.logger.info(f"close signal is risen: {signal}")
-                        results = []
-                        if signal.is_buy is None:
-                            results = strategy.client.close_all_positions(signal.symbol)
-                            if results:
-                                self.logger.info(f"positions are closed, remaining budget is {strategy.client.wallet.budget}")
-                        elif signal.is_buy is True:
-                            results = strategy.client.close_short_positions(signal.symbol)
-                            if results:
-                                self.logger.info(f"short positions are closed, remaining budget is {strategy.client.wallet.budget}")
-                        elif signal.is_buy is False:
-                            results = strategy.client.close_long_positions(signal.symbol)
-                            if results:
-                                self.logger.info(f"long positions are closed, remaining budget is {strategy.client.wallet.budget}")
-
-                        if len(results) > 0:
-                            for result in results:
-                                # (price, position.price, price_diff, profit, True)
-                                if result is not None:
-                                    if result[-1]:
-                                        self.logger.info(f"closed result: {result}")
-                                        closedCount += 1
-                                        self.results[symbol].append(result[2])
-                                    else:
-                                        self.logger.info(f"pending closed result: {result}")
-                                        closedByPendingCount += 1
-                                        self.results[symbol].append(result[0][2])
-                    if signal.id != 10:
-                        if signal.is_buy:
-                            position = strategy.client.open_trade(
-                                signal.is_buy,
-                                amount=signal.amount,
-                                price=signal.order_price,
-                                tp=signal.tp,
-                                sl=signal.sl,
-                                order_type=signal.order_type,
-                                symbol=signal.symbol,
-                            )
-                            self.logger.info(
-                                f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
-                            )
-                            buySignalCount += 1
-                        elif signal.is_buy is False:
-                            position = strategy.client.open_trade(
-                                is_buy=signal.is_buy,
-                                amount=signal.amount,
-                                price=signal.order_price,
-                                tp=signal.tp,
-                                sl=signal.sl,
-                                order_type=signal.order_type,
-                                symbol=signal.symbol,
-                            )
-                            self.logger.info(
-                                f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
-                            )
-                            sellSignalCount += 1
-            if do_sleep:
-                base_time = time.time()
-                next_time = ((base_time - time.time()) % interval) or interval
-                self.logger.debug(f"wait {sleep_time} to run on next frame")
-                # time.sleep(next_time)
-                if self.event.wait(timeout=next_time):
-                    # self.logger.info("Close all positions as for ending the strategies.")
-                    # strategy.client.close_all_positions()
-                    break
+            for signal in signals:
+                position, closed_results = self._handle_signal(strategy, signal)
+                for result in closed_results:
+                    # (price, position.price, price_diff, profit, True)
+                    if result is not None:
+                        if result[-1]:
+                            self.logger.info(f"closed result: {result}")
+                            results[symbol].append(result[2])
+                        else:
+                            self.logger.info(f"pending closed result: {result}")
+                            results[symbol].append(result[0][2])
             if count % 10 == 0:
-                self.logger.debug(f"{count+1} times caliculated. {buySignalCount}, {sellSignalCount}, {closedCount}, {closedByPendingCount}")
-                print(strategy.client.get_portfolio())
-                print(strategy.client.get_budget())
+                self.logger.info(strategy.client.get_portfolio())
+                self.logger.info(strategy.client.get_budget())
             count += 1
+        self._summary(results)
 
-        for symbol in symbols:
-            totalSignalCount = len(self.results[symbol])
-            if totalSignalCount != 0:
-                revenue = sum(self.results[symbol])
-                winList = list(filter(lambda x: x >= 0, self.results[symbol]))
-                winCount = len(winList)
-                winRevenute = sum(winList)
-                resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
-                self.logger.info(resultTxt)
-                self.logger.info(
-                    f"buy signal rose:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}"
-                )
-                var = statistics.pvariance(self.results[symbol])
-                mean = statistics.mean(self.results[symbol])
-                self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
-                # TODO: add profit per year
-        print(f"Storategy Ended. Frame: {strategy.client.frame}")
+    def start(self, strategy: StrategyClient):
+        parent_pipe, child_pipe = multiprocessing.Pipe()
+        timer_event = threading.Event()
+        self.logger.debug("start waiting user input")
+        self.logger.input(child_pipe)
+        self.logger.debug("start timer")
+        self.timer(timer_event, child_pipe, strategy.interval_mins)
 
-    def start_strategies(self, wait=True):
-        self.__start_time = datetime.datetime.now()
-        self.__end_time = self.__start_time + self.__duration
-        self.done = False
+        if strategy.client.do_render:
+            try:
+                self._start_strategy(strategy)
+            except KeyboardInterrupt:
+                self.logger.info("Finish the strategies as KeyboardInterrupt happened")
+                self.stop_event.set()
+                exit()
+        else:
+            s_t = threading.Thread(target=self._on_timer_event, args=(strategy, timer_event), daemon=True)
+            s_t.start()
+            c_t = threading.Thread(target=self._handle_command, args=(parent_pipe,), daemon=True)
+            c_t.start()
 
-        for strategy in self.strategies:
-            if strategy.client.do_render:
+            def signal_handler(sig, frame):
                 try:
-                    self.__start_strategy(strategy)
-                except KeyboardInterrupt:
-                    self.logger.info("Finish the strategies as KeyboardInterrupt happened")
-                    self.summary()
-                    self.event.set()
-                    self.done = True
-                    exit()
-            else:
-                t = threading.Thread(target=self.__start_strategy, args=(strategy,), daemon=False)
-                t.start()
-                self.logger.debug("started strategy")
-                if wait:
-                    try:
-                        ui = input("Please input 'exit' to end the strategies.")
-                        if ui.lower() == "exit":
-                            self.event.set()
-                            self.done = True
-                            if t.is_alive():
-                                try:
-                                    exit()
-                                except Exception:
-                                    pass
-                    except KeyboardInterrupt:
-                        self.logger.info("Finish the strategies as KeyboardInterrupt happened")
-                        self.event.set()
-                        self.done = True
-                        if t.is_alive():
-                            try:
-                                exit()
-                            except Exception:
-                                pass
+                    child_pipe.send(Command.end)
+                except Exception:
+                    pass
+                self.stop_event.set()
+                self.logger.debug("strategy thred is closed")
+                c_t.join()
+                self.logger.debug("command thred is closed")
+                self.logger.close()
+                self.logger.debug("console thred is closed")
+                self.timer.done = True
 
-    def stop_strategies(self):
-        self.done = True
+            signal.signal(signal.SIGINT, signal_handler)
 
-    def summary(self):
-        totalRevenue = 0
-        totalWinCount = 0
-        totalSignalCount = 0
-        totalWinRevenute = 0
-        for strategy in self.strategies:
-            symbol = strategy.client.symbols[0]
-            totalRevenue += sum(self.results[symbol])
-            totalSignalCount += len(self.results[symbol])
-            winList = list(filter(lambda x: x >= 0, self.results[symbol]))
-            totalWinCount += len(winList)
-            totalWinRevenute = sum(winList)
-        resultTxt = f"Revenute:{totalRevenue}, signal count: {totalSignalCount}, win Rate: {totalWinCount}, plus: {totalWinRevenute}, minus: {totalRevenue - totalWinRevenute}"
-        print(resultTxt)
+    def _on_timer_event(self, strategy, timer_event: threading.Event):
+        if timer_event.wait(60):
+            self._start_strategy(strategy)
+        timer_event.clear()
+        self._on_timer_event(strategy, timer_event)
+
+    def _handle_command(self, pipe):
+        while self.stop_event.is_set() is False:
+            msg = pipe.recv()
+            if msg == Command.disable:
+                self.enable_long = False
+                self.enable_short = False
+            elif msg == Command.disable_long:
+                self.enable_long = False
+            elif msg == Command.disable_short:
+                self.enable_short = False
+            elif msg == Command.enable:
+                self.enable_long = True
+                self.enable_short = True
+            elif msg == Command.enable_short:
+                self.enable_short = True
+            elif msg == Command.enable_long:
+                self.enable_long = True
+            elif msg == Command.end:
+                self.end()
+                break
+
+    def reset(self, start_date, end_date):
+        self.stop_event.set()
+        self.stop_event = threading.Event()
+        self.timer = Timer(start_date=start_date, end_date=end_date)
+        self.enable_long = True
+        self.enable_short = True
+
+    def end(self):
+        self.stop_event.set()
+        self.logger.close()
+        self.timer.done = True
+
+
+class ParallelStrategyManager(StrategyManager):
+    def __init__(self, start_date, end_date, logger=None) -> None:
+        super().__init__(start_date, end_date, logger)
+
+    def start(self, strategies: list):
+        parent_pipe, child_pipe = multiprocessing.Pipe()
+        self.timer(child_pipe, strategies[0].interval_mins)
+        self.logger.input(child_pipe)
+        warned = False
+
+        for strategy in strategies:
+            if strategy.client.do_render:
+                if warned is False:
+                    self.logger.warn("disable to render mode since Parallel strategy doesn't support it")
+                    warned = True
+                strategy.client.do_render = False
+            strategy.logger = self.logger
+            t = threading.Thread(target=self._start_strategy, args=(strategy,), daemon=False)
+            t.start()
+            self._handle_command(parent_pipe)
