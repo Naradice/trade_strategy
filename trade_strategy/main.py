@@ -1,13 +1,17 @@
 import csv
 import datetime
-from logging import getLogger, config
-import json
-import os
+import multiprocessing
+import signal
 import statistics
 import threading
 import time
+from logging import INFO
+from typing import Any
+
+from trade_strategy.strategies import StrategyClient
 
 from .strategies import StrategyClient
+from .console import Console, Command
 
 logger = getLogger(__name__)
 
@@ -134,8 +138,14 @@ class ParallelStrategyManager:
             interval = interval_mins * 60
             do_sleep = True
         else:
-            interval = 1
-            do_sleep = False
+            update_frame = update_frame_minutes * 60
+        if self.is_timer_running is False:
+            t = threading.Thread(target=self.__wait_until_start_date, daemon=False)
+            t.start()
+            t.join()
+            t = threading.Thread(target=self.__timer_sleep, args=(timer_event, pipe, update_frame), daemon=False)
+            t.start()
+            self.is_timer_running = True
 
         count = 0
         if self.symbols is None:
@@ -168,6 +178,7 @@ class ParallelStrategyManager:
                 except Exception as e:
                     logger.error(f"error occured when getting portfolio or budget: {e}")
             count += 1
+        self._summary(results)
 
         for symbol, results in self.runner.results.items():
             totalSignalCount = len(results)
@@ -190,13 +201,20 @@ class ParallelStrategyManager:
                         logger.error(f"error occured when writing result csv: {e}")
         print(f"Strategy Ended. Frame: {strategy.client.frame}")
 
-    def start_strategies(self, wait=True):
-        self.__start_time = datetime.datetime.now()
-        self.__end_time = self.__start_time + self.__duration
-        self.done = False
+        if strategy.client.do_render:
+            try:
+                self._start_strategy(strategy)
+            except KeyboardInterrupt:
+                self.logger.info("Finish the strategies as KeyboardInterrupt happened")
+                self.stop_event.set()
+                exit()
+        else:
+            s_t = threading.Thread(target=self._on_timer_event, args=(strategy, timer_event), daemon=True)
+            s_t.start()
+            c_t = threading.Thread(target=self._handle_command, args=(parent_pipe,), daemon=True)
+            c_t.start()
 
-        for strategy in self.strategies:
-            if strategy.client.do_render:
+            def signal_handler(sig, frame):
                 try:
                     self._start_strategy(strategy)
                 except KeyboardInterrupt:
@@ -230,8 +248,7 @@ class ParallelStrategyManager:
                             except Exception:
                                 pass
 
-    def stop_strategies(self):
-        self.done = True
+            signal.signal(signal.SIGINT, signal_handler)
 
     def summary(self):
         totalRevenue = 0
