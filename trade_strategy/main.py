@@ -7,6 +7,7 @@ import time
 from logging import INFO
 from typing import Any
 
+import pandas as pd
 from trade_strategy.strategies import StrategyClient
 
 from .strategies import StrategyClient
@@ -32,7 +33,7 @@ class Timer:
             time.sleep(sleep_unit)
             sleep_counts -= 1
 
-    def __timer_sleep(self, event, pipe, update_frame):
+    def _timer_sleep(self, event, pipe, update_frame):
         while datetime.datetime.now() < self.end_date and self.done is False:
             self.logger.debug(f"{datetime.datetime.now()} < {self.end_date}")
             if update_frame is not None:
@@ -49,7 +50,7 @@ class Timer:
         except Exception:
             pass
 
-    def __wait_until_start_date(self):
+    def _wait_until_start_date(self):
         delta = self.start_date - datetime.datetime.now()
         delta_seconds = delta.total_seconds()
         if delta_seconds > 0:
@@ -80,6 +81,51 @@ class Timer:
             self._sleep(seconds)
         except KeyboardInterrupt:
             pass
+
+
+class ParallelTimer(Timer):
+    def __init__(self, start_date: datetime, end_date: datetime, logger) -> None:
+        super().__init__(start_date, end_date, logger)
+
+    def _timer_sleep(self, time_pipe, command_pipe, update_frame_df: pd.DataFrame):
+        initial_freq = dict(update_frame_df.reset_index().values)
+
+        while datetime.datetime.now() < self.end_date and self.done is False:
+            update_frame_df.sort_values(by="freq", inplace=True)
+            popped_freq_df = update_frame_df.iloc[0]
+            update_frame_df = update_frame_df.iloc[1:]
+
+            sleep_mins = popped_freq_df["freq"]
+            popped_index = popped_freq_df.name
+            update_frame_df -= sleep_mins
+            initial_sleep_mins = initial_freq[popped_index]
+            popped_initial_time_df = pd.DataFrame({"freq": [initial_sleep_mins]}, index=[popped_index])
+            self._sleep(sleep_mins * 60)
+            try:
+                time_pipe.send(popped_index)
+            except Exception:
+                pass
+            update_frame_df = pd.concat([update_frame_df, popped_initial_time_df])
+        try:
+            command_pipe.send(Command.end)
+        except Exception:
+            pass
+
+    def __call__(self, timer_pipe, pipe, update_frame_minutes_list: list) -> Any:
+        # check if length greater than or equal to 2
+        # check if all update frame minutes are less than 0 or not.
+        # if one of them is less than 0, return error
+        # if all of them are greater than 0, run timer
+        if self.is_timer_running is False:
+            indices = list(range(len(update_frame_minutes_list)))
+            update_frame_df = pd.DataFrame({"freq": update_frame_minutes_list}, index=indices)
+
+            t = threading.Thread(target=self._wait_until_start_date, daemon=False)
+            t.start()
+            t.join()
+            t = threading.Thread(target=self._timer_sleep, args=(timer_pipe, pipe, update_frame_df), daemon=False)
+            t.start()
+            self.is_timer_running = True
 
 
 class StrategyManager:
@@ -154,7 +200,8 @@ class StrategyManager:
             return position, close_results
 
     def _start_strategy(self, strategy: StrategyClient, count=-1):
-        self.logger.info("started strategy")
+        self.logger.info(f"started strategy")
+        self.logger.debug(f"started strategy: {strategy.key}, {strategy.interval_mins}")
         results = {}
         symbols = strategy.client.symbols.copy()
         for symbol in symbols:
@@ -221,10 +268,10 @@ class StrategyManager:
             signal.signal(signal.SIGINT, signal_handler)
 
     def _on_timer_event(self, strategy, timer_event: threading.Event):
-        if timer_event.wait(60):
-            self._start_strategy(strategy)
-        timer_event.clear()
-        self._on_timer_event(strategy, timer_event)
+        while self.stop_event.is_set() is False:
+            if timer_event.wait(60):
+                self._start_strategy(strategy)
+                timer_event.clear()
 
     def _handle_command(self, pipe):
         while self.stop_event.is_set() is False:
@@ -261,13 +308,28 @@ class StrategyManager:
 
 
 class ParallelStrategyManager(StrategyManager):
-    def __init__(self, start_date, end_date, logger=None) -> None:
-        super().__init__(start_date, end_date, logger)
+    def __init__(self, start_date, end_date, logger=None, log_level=INFO) -> None:
+        super().__init__(start_date, end_date, logger, log_level)
+        self.timer = ParallelTimer(start_date, end_date, self.logger)
+
+    def _on_timer_pipe(self, strategies, timer_pipe: multiprocessing.Pipe):
+        while self.stop_event.is_set() is False:
+            strategy_index = timer_pipe.recv()
+            if strategy_index >= 0:
+                if strategy_index < len(strategies):
+                    t = threading.Thread(target=self._start_strategy, args=(strategies[strategy_index],), daemon=True)
+                    t.start()
+                else:
+                    self.logger.error(f"invalid index({strategy_index}) is specified by timer event.")
+            else:
+                break
 
     def start(self, strategies: list):
-        parent_pipe, child_pipe = multiprocessing.Pipe()
-        self.timer(child_pipe, strategies[0].interval_mins)
-        self.logger.input(child_pipe)
+        command_parent_pipe, command_child_pipe = multiprocessing.Pipe()
+        timer_parent_pipe, timer_child_pipe = multiprocessing.Pipe()
+        update_frame_minutes_list = [strategy.interval_mins for strategy in strategies]
+        self.timer(timer_pipe=timer_child_pipe, pipe=command_child_pipe, update_frame_minutes_list=update_frame_minutes_list)
+        self.logger.input(command_child_pipe)
         warned = False
 
         for strategy in strategies:
@@ -277,6 +339,23 @@ class ParallelStrategyManager(StrategyManager):
                     warned = True
                 strategy.client.do_render = False
             strategy.logger = self.logger
-            t = threading.Thread(target=self._start_strategy, args=(strategy,), daemon=False)
-            t.start()
-            self._handle_command(parent_pipe)
+        t = threading.Thread(target=self._on_timer_pipe, args=(strategies, timer_parent_pipe), daemon=False)
+        t.start()
+        c_t = threading.Thread(target=self._handle_command, args=(command_parent_pipe,), daemon=True)
+        c_t.start()
+
+        def signal_handler(sig, frame):
+            try:
+                command_child_pipe.send(Command.end)
+                timer_child_pipe.send(-100)
+            except Exception:
+                pass
+            self.stop_event.set()
+            self.logger.debug("strategy thred is closed")
+            c_t.join()
+            self.logger.debug("command thred is closed")
+            self.logger.close()
+            self.logger.debug("console thred is closed")
+            self.timer.done = True
+
+        signal.signal(signal.SIGINT, signal_handler)
