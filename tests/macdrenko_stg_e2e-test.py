@@ -3,7 +3,6 @@ import unittest, os, json, sys, datetime
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(module_path)
 import trade_strategy as ts
-from finance_client.client_base import Client
 from finance_client.csv.client import CSVClient
 from finance_client.fprocess.fprocess.idcprocess import *
 
@@ -50,10 +49,11 @@ class Test(unittest.TestCase):
         rtp_p = RangeTrendProcess(slope_window=3)
         bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
         st1 = ts.strategies.MACDRenkoRangeSLByBB(
-            client, renko_p, macd_p, bband_process, rtp_p, slope_window=5, interval_mins=0, data_length=70, logger=logger
+            client, renko_p, macd_p, bband_process, rtp_p, slope_window=5, interval_mins=-1, data_length=70, logger=logger
         )
-        manager = ts.ParallelStrategyManager([st1], minutes=1, logger=logger)
-        manager.start_strategies()
+        start_date = datetime.datetime.now()
+        manager = ts.StrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=120), logger=logger)
+        manager.start(st1)
 
     def test_MACDWidthCSV1DSymbols(self):
         stgs = []
@@ -74,8 +74,9 @@ class Test(unittest.TestCase):
             renko_p = RenkoProcess(window=30)
             st = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=3, interval_mins=0, data_length=30, logger=logger)
             stgs.append(st)
-        manager = ts.MultiSymbolStrategyManager(stgs, minutes=3, logger=logger)
-        manager.start_strategies()
+        start_date = datetime.datetime.now()
+        manager = ts.ParallelStrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=180), logger=logger)
+        manager.start(stgs)
 
 
 if __name__ == "__main__":

@@ -25,15 +25,16 @@ file_path = os.path.abspath("L:/data/fx/OANDA-Japan MT5 Live/mt5_USDJPY_min5.csv
 
 
 class Test(unittest.TestCase):
-    # def test_MACDCrossCSV(self):
-    #     frames = [10, 120]
-    #     client = CSVClient(file_path, auto_step_index=True, start_index=2000, logger=logger, symbols=["USDJPY"])
-    #     ohlc_columns = client.get_ohlc_columns()
-    #     macd_process = MACDProcess(target_column=ohlc_columns["Close"])
-    #     st1 = ts.strategies.MACDCross(client, macd_process, 0, data_length=1000, logger=logger)
-    #     st_client = ts.CascadeStrategyClient(st1, frames, logger)
-    #     manager = ts.ParallelStrategyManager([st_client], minutes=1, logger=logger)
-    #     manager.start_strategies()
+    def test_MACDCrossCSV(self):
+        frames = [10, 120]
+        client = CSVClient(file_path, auto_step_index=True, start_index=2000, logger=logger, symbols=["USDJPY"])
+        ohlc_columns = client.get_ohlc_columns()
+        macd_process = MACDProcess(target_column=ohlc_columns["Close"])
+        st1 = ts.strategies.MACDCross(client, macd_process, 0, data_length=1000, logger=logger)
+        st_client = ts.CascadeStrategyClient(st1, frames, logger)
+        start_date = datetime.datetime.now()
+        manager = ts.StrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=60), logger=logger)
+        manager.start(st_client)
 
     def test_multi_strategies(self):
         frames = [30, 120]
@@ -44,8 +45,9 @@ class Test(unittest.TestCase):
         macd_process = MACDProcess(target_column=ohlc_columns["Close"])
         st2 = ts.strategies.MACDCross(client, macd_process, 0, data_length=1000, logger=logger)
         st_client = ts.CascadeStrategyClient([st1, st2], frames, logger)
-        manager = ts.ParallelStrategyManager([st_client], minutes=1, logger=logger)
-        manager.start_strategies()
+        start_date = datetime.datetime.now()
+        manager = ts.StrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=60), logger=logger)
+        manager.start(st_client)
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ class StrategyClient:
         if hasattr(idc_processes, "len"):
             self._idc_processes = idc_processes
         else:
-            self._idc_processes = None
+            self._idc_processes = []
         self.save_signal_info = save_signal_info
         self.amount = amount
         self.client = financre_client
@@ -94,6 +94,8 @@ class StrategyClient:
             Signal: Signal of this strategy
         """
         df = self.get_observation(symbols)
+        if len(df) == 0:
+            return []
         signals = []
         if type(symbols) is str:
             symbols = [symbols]

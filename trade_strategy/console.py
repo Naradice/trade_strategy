@@ -5,6 +5,32 @@ import threading
 from logging import getLogger, config, Handler, INFO
 
 
+def initialize_logger(logger=None, log_level=INFO, name="trade_strategy.main"):
+    if logger is None:
+        dir = os.path.dirname(__file__)
+        try:
+            with open(os.path.join(dir, "./settings.json"), "r") as f:
+                settings = json.load(f)
+        except Exception as e:
+            print(f"fail to load settings file on strategy main: {e}")
+            raise e
+        logger_config = settings["log"]
+        if log_level is not None:
+            try:
+                logger_config[name]["level"] = log_level
+            except:
+                pass
+        try:
+            config.dictConfig(logger_config)
+        except Exception as e:
+            print(f"fail to set configure file on strategy main: {e}")
+            raise e
+        logger = getLogger(name)
+    else:
+        logger = logger
+    return logger
+
+
 class Command:
     disable = "disable"
     disable_long = "disable long"
