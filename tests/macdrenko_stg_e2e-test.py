@@ -6,6 +6,7 @@ BASE_PATH = os.path.join(os.path.dirname(__file__), "..")
 # for finance_client
 module_path = os.path.abspath(f"{BASE_PATH}/../finance_client")
 sys.path.append(module_path)
+import trade_strategy as ts
 from finance_client.csv.client import CSVClient
 from finance_client.fprocess.fprocess.idcprocess import *
 
@@ -50,10 +51,34 @@ class Test(unittest.TestCase):
         rtp_p = RangeTrendProcess(slope_window=3)
         bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
         st1 = ts.strategies.MACDRenkoRangeSLByBB(
-            client, renko_p, macd_p, bband_process, rtp_p, slope_window=5, interval_mins=0, data_length=70
+            client, renko_p, macd_p, bband_process, rtp_p, slope_window=5, interval_mins=-1, data_length=70, logger=logger
         )
-        manager = ts.ParallelStrategyManager([st1], seconds=5)
-        manager.start_strategies()
+        start_date = datetime.datetime.now()
+        manager = ts.StrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=120), logger=logger)
+        manager.start(st1)
+
+    def test_MACDWidthCSV1DSymbols(self):
+        stgs = []
+        frame = 60 * 24
+        ohlc_columns = ["Open", "High", "Low", "Close"]
+        for path in file_paths:
+            client = CSVClient(
+                files=path,
+                auto_step_index=True,
+                frame=frame,
+                start_index=60,
+                logger=logger,
+                columns=ohlc_columns,
+                date_column=date_column,
+                slip_type="percentage",
+            )
+            macd_p = MACDProcess(short_window=6, long_window=13, signal_window=5, target_column=ohlc_columns[3])
+            renko_p = RenkoProcess(window=30)
+            st = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=3, interval_mins=0, data_length=30, logger=logger)
+            stgs.append(st)
+        start_date = datetime.datetime.now()
+        manager = ts.ParallelStrategyManager(start_date=start_date, end_date=start_date + datetime.timedelta(seconds=180), logger=logger)
+        manager.start(stgs)
 
 
 if __name__ == "__main__":

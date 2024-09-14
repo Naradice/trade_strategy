@@ -9,7 +9,6 @@ import trade_strategy as ts
 from trade_strategy.signal import BuySignal, SellSignal, CloseBuySignal, CloseSellSignal, CloseSignal, update_signal_with_close
 
 class SignalTest(unittest.TestCase):
-    
     def test_update_buysignal_with_close(self):
         buy_signal = BuySignal("unit_test", volume=1, price=1, symbol="TEST")
         signal = update_signal_with_close(buy_signal)

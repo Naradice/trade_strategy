@@ -45,9 +45,11 @@ class StrategyClient:
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
-        if not isinstance(idc_processes, list):
-            idc_processes = []
-        self._idc_processes = idc_processes
+
+        if hasattr(idc_processes, "len"):
+            self._idc_processes = idc_processes
+        else:
+            self._idc_processes = []
         self.save_signal_info = save_signal_info
         self.volume = volume
         self.client = finance_client

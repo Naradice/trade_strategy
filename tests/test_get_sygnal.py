@@ -1,8 +1,9 @@
-import unittest, os, sys
+import json
+import os
+import sys
 
-BASE_PATH = os.path.join(os.path.dirname(__file__), "..")
-# for finance_client
-module_path = os.path.abspath(f"{BASE_PATH}/../finance_client")
+base_path = os.path.dirname(__file__)
+module_path = os.path.abspath(os.path.join(base_path, ".."))
 sys.path.append(module_path)
 # for trade_strategy
 sys.path.append(BASE_PATH)
@@ -11,24 +12,9 @@ import trade_strategy.signal_trade as signal_trade
 from finance_client.csv.client import CSVClient
 from finance_client.fprocess.fprocess.idcprocess import *
 
-nikkei_codes = [
-    "3407.T",
-    "4005.T",
-    "4188.T",
-    "4042.T",
-    "4901.T",
-    "4911.T",
-    "4063.T",
-    "4452.T",
-    "4151.T",
-    "4506.T",
-    "4503.T",
-    "4502.T",
-    "4519.T",
-    "4578.T",
-    "4507.T",
-    "4523.T"
-]
+
+with open(os.path.join(base_path, "stock_codes.json")) as fp:
+    nikkei_codes = json.load(fp)
 base_path = os.path.dirname(__file__)
 file_paths = [os.path.abspath(f"L:/data/yfinance/yfinance_{symbol}_D1.csv") for symbol in nikkei_codes]
 frame = 60 * 24
