@@ -212,7 +212,13 @@ class StrategyManager:
         if self.stop_event.is_set() is False:
             symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
-            signals = strategy.run(symbols)
+            try:
+                signals = strategy.run(symbols)
+            except Exception as e:
+                self.logger.error(f"error happened when get signals: {e}")
+                self.logger.info("stop strategy since an error happened when get signals")
+                self.end()
+                return None
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")
@@ -233,7 +239,7 @@ class StrategyManager:
             count += 1
         self._summary(results)
 
-    def start(self, strategy: StrategyClient):
+    def start(self, strategy: StrategyClient, wait=False):
         parent_pipe, child_pipe = multiprocessing.Pipe()
         timer_event = threading.Event()
         if hasattr(self.logger, "input"):
@@ -273,6 +279,8 @@ class StrategyManager:
                 self.timer.done = True
 
             signal.signal(signal.SIGINT, signal_handler)
+            if wait:
+                s_t.join()
 
     def _on_timer_event(self, strategy, timer_event: threading.Event):
         while self.stop_event.is_set() is False:
@@ -332,7 +340,7 @@ class ParallelStrategyManager(StrategyManager):
             else:
                 break
 
-    def start(self, strategies: list):
+    def start(self, strategies: list, wait=True):
         command_parent_pipe, command_child_pipe = multiprocessing.Pipe()
         timer_parent_pipe, timer_child_pipe = multiprocessing.Pipe()
         update_frame_minutes_list = [strategy.interval_mins for strategy in strategies]
@@ -348,7 +356,7 @@ class ParallelStrategyManager(StrategyManager):
                     warned = True
                 strategy.client.do_render = False
             strategy.logger = self.logger
-        t = threading.Thread(target=self._on_timer_pipe, args=(strategies, timer_parent_pipe), daemon=False)
+        t = threading.Thread(target=self._on_timer_pipe, args=(strategies, timer_parent_pipe), daemon=True)
         t.start()
         c_t = threading.Thread(target=self._handle_command, args=(command_parent_pipe,), daemon=True)
         c_t.start()
@@ -368,3 +376,5 @@ class ParallelStrategyManager(StrategyManager):
             self.timer.done = True
 
         signal.signal(signal.SIGINT, signal_handler)
+        if wait:
+            t.join()
