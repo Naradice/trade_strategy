@@ -112,8 +112,12 @@ class ParallelTimer(Timer):
 
     def __call__(self, timer_pipe, pipe, update_frame_minutes_list: list) -> Any:
         # check if length greater than or equal to 2
-        # check if all update frame minutes are less than 0 or not.
+        if len(update_frame_minutes_list) < 2:
+            raise ValueError("length is less than 1. Please use Timer")
         # if one of them is less than 0, return error
+        for frame in update_frame_minutes_list:
+            if frame < 0:
+                raise ValueError("simulation time frame is not suppported.")
         # if all of them are greater than 0, run timer
         if self.is_timer_running is False:
             indices = list(range(len(update_frame_minutes_list)))
@@ -341,6 +345,8 @@ class ParallelStrategyManager(StrategyManager):
                 break
 
     def start(self, strategies: list, wait=True):
+        if len(strategies) <= 1:
+            raise ValueError("Length of strategy list is less than 1. Please use StrategyManager.")
         command_parent_pipe, command_child_pipe = multiprocessing.Pipe()
         timer_parent_pipe, timer_child_pipe = multiprocessing.Pipe()
         update_frame_minutes_list = [strategy.interval_mins for strategy in strategies]
