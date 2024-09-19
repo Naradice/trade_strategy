@@ -21,6 +21,7 @@ class Timer:
         self.done = False
         self.is_timer_running = False
         self.logger = logger
+        self.thread = None
 
     def _sleep(self, secs: float):
         if secs < 0:
@@ -60,6 +61,7 @@ class Timer:
             self._sleep(delta_seconds)
 
     def __call__(self, timer_event, pipe, update_frame_minutes) -> Any:
+        self.done = False
         # convert minutes to seconds
         if update_frame_minutes is None:
             update_frame = None
@@ -68,11 +70,11 @@ class Timer:
         else:
             update_frame = update_frame_minutes * 60
         if self.is_timer_running is False:
-            t = threading.Thread(target=self._wait_until_start_date, daemon=False)
+            t = threading.Thread(target=self._wait_until_start_date, daemon=True)
             t.start()
             t.join()
-            t = threading.Thread(target=self._timer_sleep, args=(timer_event, pipe, update_frame), daemon=False)
-            t.start()
+            self.thread = threading.Thread(target=self._timer_sleep, args=(timer_event, pipe, update_frame), daemon=True)
+            self.thread.start()
             self.is_timer_running = True
 
     def sleep(self, seconds):
@@ -80,6 +82,12 @@ class Timer:
             self._sleep(seconds)
         except KeyboardInterrupt:
             pass
+
+    def stop(self):
+        self.done = True
+        if self.thread is not None:
+            self.thread.join()
+        self.is_timer_running = False
 
 
 class ParallelTimer(Timer):
@@ -111,6 +119,7 @@ class ParallelTimer(Timer):
             pass
 
     def __call__(self, timer_pipe, pipe, update_frame_minutes_list: list) -> Any:
+        self.done = False
         # check if length greater than or equal to 2
         if len(update_frame_minutes_list) < 2:
             raise ValueError("length is less than 1. Please use Timer")
@@ -123,11 +132,11 @@ class ParallelTimer(Timer):
             indices = list(range(len(update_frame_minutes_list)))
             update_frame_df = pd.DataFrame({"freq": update_frame_minutes_list}, index=indices)
 
-            t = threading.Thread(target=self._wait_until_start_date, daemon=False)
+            t = threading.Thread(target=self._wait_until_start_date, daemon=True)
             t.start()
             t.join()
-            t = threading.Thread(target=self._timer_sleep, args=(timer_pipe, pipe, update_frame_df), daemon=False)
-            t.start()
+            self.thread = threading.Thread(target=self._timer_sleep, args=(timer_pipe, pipe, update_frame_df), daemon=True)
+            self.thread.start()
             self.is_timer_running = True
 
 
@@ -206,7 +215,7 @@ class StrategyManager:
             return position, close_results
         return None, []
 
-    def _start_strategy(self, strategy: StrategyClient, count=-1):
+    def _start_strategy(self, strategy: StrategyClient, pipe, count=-1):
         self.logger.debug("started strategy")
         results = {}
         symbols = strategy.client.symbols.copy()
@@ -214,6 +223,11 @@ class StrategyManager:
             results[symbol] = []
 
         if self.stop_event.is_set() is False:
+            if pipe.poll():
+                cmd = pipe.recv()
+                self._handle_command(cmd)
+                if cmd == Command.end:
+                    return None
             symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
             try:
@@ -264,10 +278,8 @@ class StrategyManager:
                 self.stop_event.set()
                 exit()
         else:
-            s_t = threading.Thread(target=self._on_timer_event, args=(strategy, timer_event), daemon=True)
+            s_t = threading.Thread(target=self._on_timer_event, args=(strategy, parent_pipe, timer_event), daemon=True)
             s_t.start()
-            c_t = threading.Thread(target=self._handle_command, args=(parent_pipe,), daemon=True)
-            c_t.start()
 
             def signal_handler(sig, frame):
                 try:
@@ -275,43 +287,43 @@ class StrategyManager:
                 except Exception:
                     pass
                 self.stop_event.set()
-                self.logger.debug("strategy thred is closed")
-                c_t.join()
-                self.logger.debug("command thred is closed")
+                self.logger.debug("strategy thread is closed")
                 self.logger.close()
-                self.logger.debug("console thred is closed")
-                self.timer.done = True
+                self.logger.debug("console thread is closed")
+                self.timer.stop()
+                self.logger.debug("timer thread is closed")
 
             signal.signal(signal.SIGINT, signal_handler)
             if wait:
                 s_t.join()
 
-    def _on_timer_event(self, strategy, timer_event: threading.Event):
+    def _on_timer_event(self, strategy, parent_pipe, timer_event: threading.Event):
         while self.stop_event.is_set() is False:
             if timer_event.wait(60):
-                self._start_strategy(strategy)
+                self._start_strategy(strategy, parent_pipe)
                 timer_event.clear()
 
-    def _handle_command(self, pipe):
-        while self.stop_event.is_set() is False:
-            msg = pipe.recv()
-            if msg == Command.disable:
-                self.enable_long = False
-                self.enable_short = False
-            elif msg == Command.disable_long:
-                self.enable_long = False
-            elif msg == Command.disable_short:
-                self.enable_short = False
-            elif msg == Command.enable:
-                self.enable_long = True
-                self.enable_short = True
-            elif msg == Command.enable_short:
-                self.enable_short = True
-            elif msg == Command.enable_long:
-                self.enable_long = True
-            elif msg == Command.end:
-                self.end()
-                break
+    def _handle_command(self, msg):
+        self.logger.debug(f"received: {msg}")
+        if msg == Command.disable:
+            self.enable_long = False
+            self.enable_short = False
+        elif msg == Command.disable_long:
+            self.enable_long = False
+        elif msg == Command.disable_short:
+            self.enable_short = False
+        elif msg == Command.enable:
+            self.enable_long = True
+            self.enable_short = True
+        elif msg == Command.enable_short:
+            self.enable_short = True
+        elif msg == Command.enable_long:
+            self.enable_long = True
+        elif msg == Command.end:
+            self.logger.debug("end command received")
+            self.end()
+        else:
+            self.logger.info(f"unkown command received: {msg}")
 
     def reset(self, start_date, end_date):
         self.stop_event.set()
@@ -324,7 +336,7 @@ class StrategyManager:
         self.stop_event.set()
         if hasattr(self.logger, "close"):
             self.logger.close()
-        self.timer.done = True
+        self.timer.stop()
 
 
 class ParallelStrategyManager(StrategyManager):

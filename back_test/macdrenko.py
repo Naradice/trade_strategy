@@ -23,16 +23,9 @@ logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_strategy.back_test")
 
-# file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min30.csv'))
-# date_column = "Time"
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_min30.csv")
-# frame = 30
 file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_h1.csv")
 frame = 60
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_h2.csv')
-# frame = 120
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_d1.csv")
-# frame = 60*24
+
 date_column = "time"
 ohlc_columns = ["open", "high", "low", "close"]
 
@@ -53,10 +46,13 @@ def MACDRenko(slope=5):
     )
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
-    st1 = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope, interval_mins=0, data_length=120, logger=logger,
-                                  rsi_threshold=(80, 20))
-    manager = ts.ParallelStrategyManager([st1], minutes=60, logger=logger)
-    manager.start_strategies()
+    st1 = ts.strategies.MACDRenko(
+        client, renko_p, macd_p, slope_window=slope, interval_mins=0, data_length=120, logger=logger, rsi_threshold=(80, 20)
+    )
+    start_date = datetime.datetime.now()
+    end_date = start_date + datetime.timedelta(minutes=1)
+    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, logger=logger)
+    manager.start(st1, wait=True)
 
 
 def MACDRenkoByBBCSV(slope=5):
@@ -77,10 +73,14 @@ def MACDRenkoByBBCSV(slope=5):
     bband_process = BBANDProcess(target_column=columns["Close"], alpha=3)
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
-    st1 = ts.strategies.MACDRenkoSLByBB(client, renko_p, macd_p, slope_window=slope, bolinger_process=bband_process,
-                                         interval_mins=0, data_length=120, logger=logger)
-    manager = ts.ParallelStrategyManager([st1], minutes=30, logger=logger)
-    manager.start_strategies()
+    st1 = ts.strategies.MACDRenkoSLByBB(
+        client, renko_p, macd_p, slope_window=slope, bolinger_process=bband_process, interval_mins=0, data_length=120, logger=logger
+    )
+    start_date = datetime.datetime.now()
+    end_date = start_date + datetime.timedelta(minutes=30)
+    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, logger=logger)
+    manager.start(st1)
+
 
 def MACDRenkoRangeCSV(slope=5):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
@@ -95,14 +95,16 @@ def MACDRenkoRangeCSV(slope=5):
         date_column=date_column,
         slip_type="percent",
         do_render=False,
-        storage=storage
+        storage=storage,
     )
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
     rtp_p = RangeTrendProcess(slope_window=3)
     st1 = ts.strategies.MACDRenkoRange(client, renko_p, macd_p, rtp_p, slope_window=slope, interval_mins=0, data_length=120, logger=logger)
-    manager = ts.ParallelStrategyManager([st1], minutes=60 * 2, logger=logger)
-    manager.start_strategies()
+    start_date = datetime.datetime.now()
+    end_date = start_date + datetime.timedelta(minutes=30)
+    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, logger=logger)
+    manager.start(st1)
 
 
 def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
@@ -118,7 +120,7 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
         date_column=date_column,
         slip_type="percent",
         do_render=False,
-        storage=storage
+        storage=storage,
     )
     columns = client.get_ohlc_columns()
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
@@ -126,11 +128,23 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
     rtp_p = RangeTrendProcess(slope_window=3)
     bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
     st1 = ts.strategies.MACDRenkoRangeSLByBB(
-        client, renko_p, macd_p, bband_process, rtp_p, slope_window=slope_window, interval_mins=0, data_length=120, use_tp=use_tp, logger=logger,
-        alpha=4, bolinger_threshold=2
+        client,
+        renko_p,
+        macd_p,
+        bband_process,
+        rtp_p,
+        slope_window=slope_window,
+        interval_mins=0,
+        data_length=120,
+        use_tp=use_tp,
+        logger=logger,
+        alpha=4,
+        bolinger_threshold=2,
     )
-    manager = ts.ParallelStrategyManager([st1], minutes=60 * 2, logger=logger)
-    manager.start_strategies()
+    start_date = datetime.datetime.now()
+    end_date = start_date + datetime.timedelta(minutes=30)
+    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, logger=logger)
+    manager.start(st1)
 
 
 if __name__ == "__main__":

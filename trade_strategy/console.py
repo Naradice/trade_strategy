@@ -111,34 +111,37 @@ class Console:
             self.logger = logger
         self.logger.setLevel(self.log_level)
         self.done = False
+        self.thread = None
 
-    def _start(self, stdscr, pipe):
+    def _start(self, pipe):
+        curses.wrapper(self._wait_input, pipe=pipe)
+
+    def _wait_input(self, stdscr, pipe):
+        # https://github.com/zephyrproject-rtos/windows-curses/issues/8
+        curses.raw()
         input_box = InputBox()
         curses_handler = CursesHandler(stdscr, input_box)
         curses_handler.setLevel(self.log_level)
         self.logger.addHandler(curses_handler)
-        t = threading.Thread(
-            target=self._wait_input,
-            args=(stdscr, pipe, input_box, curses_handler),
-        )
-        t.start()
 
-    def _wait_input(self, stdscr, pipe, input_box, curses_handler):
         user_input = None
         stdscr.timeout(5000)
-        while user_input != Command.end and self.done is False:
+
+        while self.done is False:
             ch = stdscr.getch(
                 curses.LINES - 1,
                 len("Command: ") + len(input_box.get_current_input()),
             )
             if ch != -1:
                 stdscr.timeout(-1)
-                if ch == 10:
+                # enter
+                if ch == 13:
                     user_input = input_box.get_current_input()
                     try:
                         pipe.send(user_input)
-                    except Exception:
-                        pass
+                    except BrokenPipeError:
+                        self.close()
+                        break
                     stdscr.refresh()
                     input_box.reset()
                     if user_input == Command.end:
@@ -146,11 +149,20 @@ class Console:
                         break
                     else:
                         stdscr.timeout(5000)
+                # Ctrl+c
+                elif ch == 3:
+                    self.logger.error("Keyboard Interupt on console thread")
+                    self.logger.removeHandler(curses_handler)
+                    pipe.send(Command.end)
+                    self.close()
+                    break
                 else:
                     input_box.add_char(ch)
 
     def input(self, pipe):
-        curses.wrapper(self._start, pipe=pipe)
+        self.done = False
+        self.thread = threading.Thread(target=self._start, args=(pipe,), daemon=True)
+        self.thread.start()
 
     def debug(self, msg):
         self.logger.debug(msg)
@@ -165,10 +177,13 @@ class Console:
         self.logger.warn(msg)
 
     def close(self):
-        self.logger.info("close console window")
+        self.logger.debug("close console window")
         try:
             curses.endwin()
         except Exception as e:
             self.logger.error(f"failed to close console window: {e}")
             print(e)
         self.done = True
+        if self.thread is not None:
+            if self.thread is not threading.current_thread():
+                self.thread.join()
