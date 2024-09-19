@@ -30,13 +30,9 @@ config.dictConfig(logger_config)
 logger = getLogger("trade_strategy.back_test")
 data_folder = os.environ["ts_data_folder"]
 
-frame = 30
-if frame == 1:
-    file_path = os.path.abspath(f"{data_folder}/mt5_USDJPY_TickToMIN1.csv")
-elif frame < 60:
-    file_path = os.path.abspath(f"{data_folder}/mt5_USDJPY_min{frame}.csv")
-else:
-    file_path = os.path.abspath(f"{data_folder}/mt5_USDJPY_h{int(frame/60)}.csv")
+file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_h1.csv")
+frame = 60
+
 date_column = "time"
 ohlc_columns = ["open", "high", "low", "close"]
 
@@ -132,7 +128,7 @@ def MACDRenkoRangeCSV(slope=5):
         date_column=date_column,
         slip_type="percent",
         do_render=False,
-        storage=storage
+        storage=storage,
     )
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
@@ -156,7 +152,7 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
         date_column=date_column,
         slip_type="percent",
         do_render=False,
-        storage=storage
+        storage=storage,
     )
     columns = client.get_ohlc_columns()
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
@@ -164,8 +160,18 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
     rtp_p = RangeTrendProcess(slope_window=3)
     bband_process = BBANDProcess(target_column=columns["Close"], alpha=2)
     st1 = ts.strategies.MACDRenkoRangeSLByBB(
-        client, renko_p, macd_p, bband_process, rtp_p, slope_window=slope_window, interval_mins=0, data_length=120, use_tp=use_tp, logger=logger,
-        alpha=4, bolinger_threshold=2
+        client,
+        renko_p,
+        macd_p,
+        bband_process,
+        rtp_p,
+        slope_window=slope_window,
+        interval_mins=0,
+        data_length=120,
+        use_tp=use_tp,
+        logger=logger,
+        alpha=4,
+        bolinger_threshold=2,
     )
     
     manager = ts.ParallelStrategyManager([st1], minutes=MINUTES_TO_RUN, logger=logger)
