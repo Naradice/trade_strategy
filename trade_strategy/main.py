@@ -85,8 +85,6 @@ class Timer:
 
     def stop(self):
         self.done = True
-        if self.thread is not None:
-            self.thread.join()
         self.is_timer_running = False
 
 
@@ -272,7 +270,7 @@ class StrategyManager:
 
         if strategy.client.do_render:
             try:
-                self._start_strategy(strategy)
+                self._start_strategy(strategy, parent_pipe)
             except KeyboardInterrupt:
                 self.logger.info("Finish the strategies as KeyboardInterrupt happened")
                 self.stop_event.set()
@@ -344,12 +342,12 @@ class ParallelStrategyManager(StrategyManager):
         super().__init__(start_date, end_date, logger, log_level, console_mode=console_mode)
         self.timer = ParallelTimer(start_date, end_date, self.logger)
 
-    def _on_timer_pipe(self, strategies, timer_pipe: multiprocessing.Pipe):
+    def _on_timer_pipe(self, strategies, command_child_pipe: multiprocessing.Pipe, timer_pipe: multiprocessing.Pipe):
         while self.stop_event.is_set() is False:
             strategy_index = timer_pipe.recv()
             if strategy_index >= 0:
                 if strategy_index < len(strategies):
-                    t = threading.Thread(target=self._start_strategy, args=(strategies[strategy_index],), daemon=True)
+                    t = threading.Thread(target=self._start_strategy, args=(strategies[strategy_index], command_child_pipe), daemon=True)
                     t.start()
                 else:
                     self.logger.error(f"invalid index({strategy_index}) is specified by timer event.")
@@ -374,10 +372,8 @@ class ParallelStrategyManager(StrategyManager):
                     warned = True
                 strategy.client.do_render = False
             strategy.logger = self.logger
-        t = threading.Thread(target=self._on_timer_pipe, args=(strategies, timer_parent_pipe), daemon=True)
+        t = threading.Thread(target=self._on_timer_pipe, args=(strategies, command_parent_pipe, timer_parent_pipe), daemon=True)
         t.start()
-        c_t = threading.Thread(target=self._handle_command, args=(command_parent_pipe,), daemon=True)
-        c_t.start()
 
         def signal_handler(sig, frame):
             try:
@@ -387,7 +383,6 @@ class ParallelStrategyManager(StrategyManager):
                 pass
             self.stop_event.set()
             self.logger.debug("strategy thred is closed")
-            c_t.join()
             self.logger.debug("command thred is closed")
             self.logger.close()
             self.logger.debug("console thred is closed")
