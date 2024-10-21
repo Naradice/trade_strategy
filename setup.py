@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 
 install_requires = [
+      "windows-curses"
 ]
 
 setup(name='trade_strategy',

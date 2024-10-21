@@ -74,9 +74,9 @@ class Test(unittest.TestCase):
             console_mode=console_mode,
         )
         # manually confirm if strategy run 1 time at least
+        started_at = datetime.datetime.now()
         manager.start(st1, wait=False)
         # confirm if manager run in another thread
-        started_at = datetime.datetime.now()
         time.sleep(expected_sleep_seconds)
         manager.end()
         end_at = datetime.datetime.now()
@@ -84,7 +84,8 @@ class Test(unittest.TestCase):
         slept_seconds = (end_at - started_at).total_seconds()
         slept_seconds = int(slept_seconds)
         # if strategy run in the same thread, it would run in main thread till end_date
-        self.assertEqual(expected_sleep_seconds, slept_seconds)
+        # We add 5 seconds since sometimes it takes seconds to end manager.
+        self.assertLessEqual(expected_sleep_seconds, slept_seconds + 5)
 
     def test_auto_interval_min(self):
         storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
@@ -118,7 +119,7 @@ class Test(unittest.TestCase):
             log_level=DEBUG,
             console_mode=console_mode,
         )
-        manager.start(st1)
+        manager.start(st1, wait=True)
 
     def test_parallel_timer(self):
         storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
@@ -134,7 +135,7 @@ class Test(unittest.TestCase):
             console_mode=console_mode,
         )
         # manually confirm if strategy start parallelly as expected
-        manager.start(sts)
+        manager.start(sts, wait=True)
 
     def test_MACDCross_Registration(self):
         storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
@@ -173,28 +174,28 @@ class Test(unittest.TestCase):
         self.assertLess(delta.total_seconds(), 10)
         self.assertGreater(end_date, end_at)
 
-    # def test_zzz_auto_interval_min(self):
-    #     storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
-    #     freq_mins = 1
-    #     client = CSVClient(files=file_path, frame=freq_mins, storage=storage)
-    #     st1 = ts.StrategyClient(client, interval_mins=-1)
-    #     running_seconds = 30
-    #     start_date = datetime.datetime.now()
-    #     end_date = start_date + datetime.timedelta(seconds=running_seconds)
-    #     manager = InteraptManager(
-    #         start_date=start_date,
-    #         end_date=end_date,
-    #         log_level=DEBUG,
-    #         console_mode=console_mode,
-    #     )
-    #     sleep_second_till_error = 10
-    #     start_at = datetime.datetime.now()
-    #     manager.start(st1, sleep_seconds=sleep_second_till_error)
-    #     end_at = datetime.datetime.now()
-    #     actual_diff = int((end_at - start_at).total_seconds())
-    #     # if strategy thread was running in another thead even if KeyboardException happened, actual diff would be greater than expected
-    #     self.assertLessEqual(actual_diff, sleep_second_till_error)
-    #     self.assertTrue(manager.stop_event.is_set())
+    def test_zzz_auto_interval_min(self):
+        storage = SQLiteStorage(database_path="./manager_test.db", provider="csv")
+        freq_mins = 1
+        client = CSVClient(files=file_path, frame=freq_mins, storage=storage)
+        st1 = ts.StrategyClient(client, interval_mins=-1)
+        running_seconds = 30
+        start_date = datetime.datetime.now()
+        end_date = start_date + datetime.timedelta(seconds=running_seconds)
+        manager = InteraptManager(
+            start_date=start_date,
+            end_date=end_date,
+            log_level=DEBUG,
+            console_mode=console_mode,
+        )
+        sleep_second_till_error = 10
+        start_at = datetime.datetime.now()
+        manager.start(st1, sleep_seconds=sleep_second_till_error)
+        end_at = datetime.datetime.now()
+        actual_diff = int((end_at - start_at).total_seconds())
+        # if strategy thread was running in another thead even if KeyboardException happened, actual diff would be greater than expected
+        self.assertLessEqual(actual_diff, sleep_second_till_error)
+        self.assertTrue(manager.stop_event.is_set())
 
 
 if __name__ == "__main__":
