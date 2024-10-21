@@ -17,7 +17,7 @@ except Exception as e:
     raise e
 logger_config = settings["log"]
 log_file_base_name = logger_config["handlers"]["fileHandler"]["filename"]
-log_path = f'./{log_file_base_name}_mrenko_{datetime.datetime.utcnow().strftime("%Y%m%d%H")}.log'
+log_path = f'./{log_file_base_name}_mrenko_{datetime.datetime.now(datetime.UTC).strftime("%Y%m%d%H")}.log'
 logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_strategy.back_test")
