@@ -14,7 +14,7 @@ class SlopeChange(StrategyClient):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         slope_column,
         short_ema_column,
         long_ema_column,
@@ -97,7 +97,7 @@ class MACDCross(StrategyClient):
         options.update(idc_options)
         return MACDCross(finance_client=finance_client, **options)
 
-    def __init__(self, finance_client: fc.Client, macd_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
+    def __init__(self, finance_client, macd_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
         """When MACD cross up, return buy signal
             When MACD cross down, return sell signal
 
@@ -145,7 +145,7 @@ class MACDRenko(StrategyClient):
         return {fc.fprocess.RenkoProcess.kinds: RenkoProcessParamKey, fc.fprocess.MACDProcess.kinds: MACDProcessParamKey}
 
     @classmethod
-    def load(self, finance_client: fc.Client, idc_processes: list, options={}):
+    def load(self, finance_client, idc_processes: list, options={}):
         required_process_keys = self.get_required_idc_param_keys()
         idc_options = {}
         for key, item in required_process_keys.items():
@@ -159,7 +159,7 @@ class MACDRenko(StrategyClient):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
         slope_window=5,
@@ -284,7 +284,7 @@ class MACDRenkoSLByBB(MACDRenko):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
         bolinger_process: fc.fprocess.BBANDProcess,
@@ -380,7 +380,7 @@ class CCICross(StrategyClient):
         options.update(idc_options)
         return CCICross(finance_client, **options)
 
-    def __init__(self, finance_client: fc.Client, cci_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
+    def __init__(self, finance_client, cci_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
         """Raise Buy/Sell signal when CCI cross up/down 0
 
         Args:
@@ -447,7 +447,7 @@ class CCIBoader(StrategyClient):
         return CCIBoader(finance_client, **options)
 
     def __init__(
-        self, finance_client: fc.Client, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, data_length=100, logger=None
+        self, finance_client, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, data_length=100, logger=None
     ) -> None:
         """Raise Buy/Sell signal when CCI cross up/down uppser/lower
 
@@ -527,7 +527,7 @@ class RangeTrade(StrategyClient):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         range_process=None,
         alpha=1,
         slope_ratio=0.4,
@@ -604,7 +604,7 @@ class MACDRenkoRange(StrategyClient):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
         range_process: fc.fprocess.RangeTrendProcess,
@@ -713,7 +713,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
         bolinger_process: fc.fprocess.BBANDProcess,
@@ -814,7 +814,7 @@ class Momentum(StrategyClient):
 
     def __init__(
         self,
-        finance_client: fc.Client,
+        finance_client,
         momentum_column,
         short_ma_column,
         atr_column,

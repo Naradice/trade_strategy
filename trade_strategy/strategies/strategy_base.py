@@ -9,11 +9,10 @@ from logging import getLogger, config
 
 class StrategyClient:
     key = "base"
-    client: fc.Client = None
 
     def __init__(
         self,
-        financre_client: fc.Client,
+        financre_client,
         idc_processes=...,
         interval_mins: int = None,
         amount=1,
@@ -129,7 +128,7 @@ class StrategyClient:
 class MultiSymbolStrategyClient(StrategyClient):
     def __init__(
         self,
-        financre_client: fc.Client,
+        financre_client,
         idc_processes=...,
         interval_mins: int = -1,
         amount=1,

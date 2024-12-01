@@ -4,8 +4,17 @@ import os
 import threading
 from logging import getLogger, config, Handler, INFO
 
+ENTER_KEY = curses.KEY_ENTER
+END_KEY = curses.KEY_END
 
 def initialize_logger(logger=None, log_level=INFO, name="trade_strategy.main"):
+    if os.name == 'posix':
+        ENTER_KEY = 10
+        END_KEY = 3
+    elif os.name == 'nt':
+        ENTER_KEY = 13
+        END_KEY = 3
+
     if logger is None:
         dir = os.path.dirname(__file__)
         try:

@@ -12,7 +12,7 @@ from . import strategies
 available_modes = ["rating", "random"]
 
 
-def __close(client: fc.Client, symbol, state):
+def __close(client, symbol, state):
     symbol = __convert_symbol(symbol)
     position_type = None
     if state == 1:
@@ -26,7 +26,7 @@ def __close(client: fc.Client, symbol, state):
     return suc, (price, position_price, price_diff, profit)
 
 
-def __order(client: fc.Client, symbol: str, signal: str, state: str):
+def __order(client, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
     if signal == "buy" and state == 0:
         print(f"buy order: {symbol}")
@@ -175,7 +175,7 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
     return False, None, None
 
 
-def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
+def order_by_signals(signals, finance_client, mode="rating"):
     if len(signals) > 0:
         sig_df = pd.DataFrame.from_dict(signals, orient="index")
         sig_sr = sig_df["signal"].dropna()
@@ -243,7 +243,7 @@ def order_by_signals(signals, finance_client: fc.Client, mode="rating"):
         print("no signals specified.")
 
 
-def order_by_signal_file(file_path: str, finance_client: fc.Client, mode="rating"):
+def order_by_signal_file(file_path: str, finance_client, mode="rating"):
     if os.path.exists(file_path):
         with open(file_path) as fp:
             signals = json.load(fp)
@@ -274,7 +274,7 @@ def __add_state_to_signal(signals, state, symbol):
 
 
 def list_signals(
-    client: fc.Client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
+    client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
 ):
     strategy = strategies.load_strategy_client(strategy_key, client, idc_processes, {"data_length": data_length})
     if signal_file_path is None:
@@ -307,7 +307,7 @@ def list_signals(
 
 
 def system_trade_one_time(
-    client: fc.Client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
+    client, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
 ):
     list_signals(client, strategy_key, data_length, candidate_symbols, idc_processes, signal_file_path)
     print("start oders")
