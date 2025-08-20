@@ -1,7 +1,8 @@
 import json
 import os
+from typing import Union
 
-import finance_client as fc
+from finance_client.client_base import ClientBase
 
 from ..signal import Signal
 from logging import getLogger, config
@@ -10,11 +11,11 @@ from trade_strategy.signal import Signal
 
 class StrategyClient:
     key = "base"
-    client: fc.Client = None
+    client: ClientBase = None
 
     def __init__(
         self,
-        financre_client: fc.Client,
+        finance_client: ClientBase,
         idc_processes=...,
         interval_mins: int = None,
         amount=1,
@@ -42,16 +43,18 @@ class StrategyClient:
             self.logger = getLogger(logger_name)
         else:
             self.logger = logger
+        if not isinstance(idc_processes, list):
+            idc_processes = []
         self.__idc_processes = idc_processes
         self.save_signal_info = save_signal_info
         self.amount = amount
-        self.client = financre_client
+        self.client = finance_client
         self.data_length = data_length
         if interval_mins is None:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins
-        self.trend = {}  # 0 don't have, 1 have long_position, -1 short_position
+        self.trends = {}  # 0 don't have, 1 have long_position, -1 short_position
 
     def add_indicaters(self, idc_processes: list):
         for process in idc_processes:
@@ -66,13 +69,13 @@ class StrategyClient:
 
     def update_trend(self, signal: Signal):
         if signal is not None:
-            self.trend[signal.symbol] = signal.trend
+            self.trends[signal.symbol] = signal.trend
 
     def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
         return None
 
-    def run(self, symbols: str or list, long_short=None) -> Signal:
+    def run(self, symbols: Union[str, list], long_short=None) -> Signal:
         """run this strategy
 
         Args:
@@ -82,7 +85,7 @@ class StrategyClient:
             Signal: Signal of this strategy
         """
         try:
-            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
+            df = self.client.get_ohlc(symbols=symbols, length=self.data_length, idc_processes=self.__idc_processes)
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
             return []
@@ -96,13 +99,16 @@ class StrategyClient:
 
         for symbol in symbols:
             if long_short is None:
-                if symbol in self.trend:
-                    position = self.trend[symbol].id
+                if symbol in self.trends:
+                    position = self.trends[symbol].id
                 else:
                     position = 0
             else:
                 position = long_short
             ohlc_df = get_dataframe(df, symbol)
+            if ohlc_df.empty:
+                print("ohlc_df is empty. skipping...", symbol)
+                continue
             if ohlc_df.iloc[-1].isnull().any() is True:
                 print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
             signal = self.get_signal(ohlc_df, position, symbol)
@@ -120,7 +126,7 @@ class StrategyClient:
 class MultiSymbolStrategyClient(StrategyClient):
     def __init__(
         self,
-        financre_client: fc.Client,
+        finance_client: ClientBase,
         idc_processes=[],
         interval_mins: int = -1,
         amount=1,
@@ -128,7 +134,7 @@ class MultiSymbolStrategyClient(StrategyClient):
         save_signal_info=False,
         logger=None,
     ) -> None:
-        super().__init__(financre_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
 
     def get_signal(self, df, position: int = None, symbols=None):
         if symbols is None:
@@ -143,7 +149,7 @@ class MultiSymbolStrategyClient(StrategyClient):
 
         print("please overwrite this method on an actual client.")
 
-    def run(self, symbols: str or list, positions=None) -> Signal:
+    def run(self, symbols: Union[str, list], positions=None) -> Signal:
         """run this strategy
 
         Args:
@@ -164,8 +170,8 @@ class MultiSymbolStrategyClient(StrategyClient):
         if positions is None:
             positions = []
             for symbol in symbols:
-                if symbol in self.trend:
-                    positions.append(self.trend[symbol].id)
+                if symbol in self.trends:
+                    positions.append(self.trends[symbol].id)
                 else:
                     positions.append(0)
 

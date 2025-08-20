@@ -6,11 +6,17 @@ import unittest
 
 import dotenv
 
-module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+BASE_PATH = os.path.join(os.path.dirname(__file__), "..")
+# for finance_client
+module_path = os.path.abspath(f"{BASE_PATH}/../finance_client")
 sys.path.append(module_path)
-import trade_strategy as ts
 import finance_client.fprocess.fprocess.idcprocess as idp
 from finance_client.csv.client import CSVClient
+
+# for trade_strategy
+module_path = os.path.abspath(BASE_PATH)
+sys.path.append(module_path)
+import trade_strategy as ts
 
 dotenv.load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 data_folder = os.environ["ts_data_folder"]

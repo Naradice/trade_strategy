@@ -96,14 +96,14 @@ class ParallelStrategyManager:
                             for result in results:
                                 # (price, position.price, price_diff, profit, True)
                                 if result is not None:
-                                    if result[-1]:
-                                        self.logger.info(f"closed result: {result}")
-                                        closedCount += 1
-                                        self.results[symbol].append(result[2])
-                                    else:
+                                    if result.error:
                                         self.logger.info(f"pending closed result: {result}")
                                         closedByPendingCount += 1
-                                        self.results[symbol].append(result[0][2])
+                                        self.results[symbol].append(result.profit)
+                                    else:
+                                        self.logger.info(f"closed result: {result}")
+                                        closedCount += 1
+                                        self.results[symbol].append(result.profit)
                     if signal.id != 10:
                         if signal.is_buy:
                             position = strategy.client.open_trade(

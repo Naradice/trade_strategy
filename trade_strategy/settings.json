@@ -44,10 +44,6 @@
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
             }
-        },
-    
-        "root": {
-            "level": "DEBUG"
         }
     }
 }
