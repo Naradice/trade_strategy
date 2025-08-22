@@ -1,4 +1,4 @@
-import unittest, os, json, sys, datetime
+import unittest, os, sys
 
 import dotenv
 
@@ -12,14 +12,8 @@ from finance_client.fprocess.fprocess.idcprocess import *
 sys.path.append(BASE_PATH)
 import trade_strategy as ts
 
-from logging import getLogger, config
-
-try:
-    with open(os.path.join(BASE_PATH, "trade_strategy/settings.json"), "r") as f:
-        settings = json.load(f)
-except Exception as e:
-    print(f"fail to load settings file: {e}")
-    raise e
+from logging import getLogger
+logger = getLogger("trade_strategy.test")
 
 dotenv.load_dotenv(".env")
 
@@ -29,7 +23,7 @@ file_path = os.path.join(data_folder, "yfinance_1333.T_D1.csv")
 
 class Test(unittest.TestCase):
     def test_MACDWidthCSV(self):
-        client = CSVClient(files=file_path, auto_step_index=True, start_index=100)
+        client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
         st1 = ts.strategies.MACDCross(client, interval_mins=0)
         manager = ts.ParallelStrategyManager([st1], seconds=10)
         manager.start_strategies()

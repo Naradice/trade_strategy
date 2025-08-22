@@ -415,9 +415,9 @@ class CCICross(StrategyClient):
         last_df = df.iloc[-1]
         current_cci = last_df[self.cci_column_name]
         if current_cci > 0:
-            self.trend = LongTrend()
+            self.trend = Trend(TREND_TYPE.up)
         else:
-            self.trend = ShortTrend()
+            self.trend = Trend(TREND_TYPE.down)
         self.add_indicaters(indicaters)
 
     def get_signal(self, df: pd.DataFrame, position, symbol: str):
@@ -492,11 +492,11 @@ class CCIBoader(StrategyClient):
         last_df = df.iloc[-1]
         current_cci = last_df[self.cci_column_name]
         if current_cci >= upper:
-            self.trend = LongTrend()
+            self.trend = Trend(TREND_TYPE.up)
         elif current_cci <= lower:
-            self.trend = ShortTrend()
+            self.trend = Trend(TREND_TYPE.down)
         else:
-            self.trend = Trend()
+            self.trend = Trend(TREND_TYPE.unknown)
         self.add_indicaters(indicaters)
 
     def get_signal(self, df: pd.DataFrame, position, symbol: str):

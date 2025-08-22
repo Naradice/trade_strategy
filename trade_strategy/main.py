@@ -10,8 +10,9 @@ from .strategies import StrategyClient
 
 
 class ParallelStrategyManager:
-    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, logger=None) -> None:
+    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, pipeline=None, logger=None) -> None:
         self.event = threading.Event()
+        self.pipeline = pipeline
         if logger is None:
             dir = os.path.dirname(__file__)
             try:
@@ -70,7 +71,11 @@ class ParallelStrategyManager:
         while datetime.datetime.now() < self.__end_time and self.done is False:
             symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
+            if self.pipeline:
+                self.pipeline.before_signal(strategy, symbols)
             signals = strategy.run(symbols)
+            if self.pipeline:
+                signals = self.pipeline.after_signal(signals)
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             self.logger.debug(f"took {diff} for caliculate the signal")

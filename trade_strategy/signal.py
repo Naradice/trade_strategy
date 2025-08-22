@@ -1,9 +1,21 @@
+from enum import Enum
+
 from finance_client.position import ORDER_TYPE
 
+class TREND_TYPE(Enum):
+    unknown = 0
+    up = 1
+    down = -1
+    range = 10
+    sideways = 20
 
 class Trend:
-    key = "base"
-    id = 0
+
+    def __init__(self, direction: TREND_TYPE, strength="unknown", reason="unknown"):
+        self.key = direction
+        self.id = direction.value
+        self.strength = strength
+        self.reason = reason
 
     def __eq__(self, other):
         return other.id == self.id
@@ -11,24 +23,13 @@ class Trend:
     def __str__(self) -> str:
         return str(id)
 
-
-class LongTrend(Trend):
-    key = "long"
-    id = 1
-
-
-class ShortTrend(Trend):
-    key = "short"
-    id = -1
-
-
 class Signal:
     def __init__(self, std_name) -> None:
         self.std_name = std_name
         self.key = "base"
-        self.trend = Trend()
+        self.trend = Trend(TREND_TYPE.unknown)
         self.id = 0
-        self.possibility = 0.0
+        self.confidence = 0.0
         self.is_buy = None  # just indicate buy or not
         self.order_type = None  # indicate more details of order type not just buy or sell
         self.is_close = False
@@ -48,14 +49,14 @@ class Signal:
         return False
 
     def __str__(self) -> str:
-        return f"(key={self.key}, symbol={self.symbol}, order_type={self.order_type}, possibility:{self.possibility}, is_close:{self.is_close}, is_buy:{self.is_buy}, order_price:{self.order_price}, tp: {self.tp}, sl:{self.sl}, dev:{self.dev})"
+        return f"(key={self.key}, symbol={self.symbol}, order_type={self.order_type}, confidence:{self.confidence}, is_close:{self.is_close}, is_buy:{self.is_buy}, order_price:{self.order_price}, tp: {self.tp}, sl:{self.sl}, dev:{self.dev})"
 
     def to_dict(self, save_option=False) -> dict:
         basic_dict = {
             "id": self.id,
             "symbol": self.symbol,
             "order_type": self.order_type.value,
-            "possibility": self.possibility,
+            "confidence": self.confidence,
             "is_buy": self.is_buy,
             "is_close": self.is_close,
             "dev": self.dev,
@@ -71,34 +72,35 @@ class Signal:
         return basic_dict
 
     @classmethod
-    def load_dict(parameters):
-        id = parameters["id"]
-        amount = parameters["amount"]
-        price = parameters["order_price"]
-        tp = parameters["tp"]
-        sl = parameters["sl"]
-        possibility = parameters["possibility"]
+    def load_dict(parameters: dict):
+        id = parameters.get("id", 0)
+        amount = parameters.get("amount", 1)
+        price = parameters.get("order_price", 0.0)
+        tp = parameters.get("tp", 0.0)
+        sl = parameters.get("sl", 0.0)
+        confidence = parameters.get("confidence", 1.0)
+        symbol = parameters.get("symbol", None)
 
         if id == 1:
-            return BuySignal("", amount, price, tp, sl)
+            return BuySignal("", amount, price, tp, sl, confidence, symbol)
         elif id == -1:
-            return SellSignal("", amount, price, tp, sl)
+            return SellSignal("", amount, price, tp, sl, confidence, symbol)
         elif id == 10:
-            return CloseSignal("", price, possibility)
+            return CloseSignal("", price, confidence, symbol)
         else:
             print("this id is not supported for now.")
 
 
 class BuySignal(Signal):
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
         self.key = "buy"
-        self.trend = LongTrend()
+        self.trend = Trend(TREND_TYPE.up)
         self.id = 1
         self.order_type = ORDER_TYPE.market
         self.is_buy = True
@@ -106,97 +108,103 @@ class BuySignal(Signal):
 
 
 class SellSignal(Signal):
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0) -> None:
+    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
         self.key = "sell"
         self.id = -1
-        self.trend = ShortTrend()
+        self.trend = Trend(TREND_TYPE.down)
         self.order_type = ORDER_TYPE.market
         self.is_buy = False
+        self.symbol = symbol
 
 
 class BuyPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, possibility: float = 1.0) -> None:
+    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
         self.key = "buy_pending"
-        self.trend = LongTrend()
+        self.trend = Trend(TREND_TYPE.up)
         self.id = 2
         self.order_type = "Pending"
         self.is_buy = True
+        self.symbol = symbol
 
 
 class SellPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, possibility: float = 1.0) -> None:
+    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
         self.key = "sell_order"
-        self.trend = ShortTrend()
+        self.trend = Trend(TREND_TYPE.down)
         self.id = -2
         self.order_type = "Pending"
         self.is_buy = False
+        self.symbol = symbol
 
 
 class CloseSignal(Signal):
     "signal to close all position"
 
-    def __init__(self, std_name, price: float = None, possibility: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name, price: float = None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
 
         self.order_price = price
-        self.possibility = possibility
+        self.confidence = confidence
         self.symbol = symbol
         self.key = "close"
-        self.trend = Trend()
+        self.trend = Trend(TREND_TYPE.unknown)
         self.id = 10
         self.order_type = ORDER_TYPE.market
         self.is_buy = None
         self.is_close = True
+        self.symbol = symbol
 
 
 class CloseBuySignal(Signal):
     "signal to close short position"
 
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0) -> None:
+    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
         self.key = "close_buy"
         self.id = 11
-        self.trend = Trend()
+        self.trend = Trend(TREND_TYPE.up)
         self.order_type = ORDER_TYPE.market
         self.is_buy = True
         self.is_close = True
+        self.symbol = symbol
 
 
 class CloseSellSignal(Signal):
     "signal to close short position"
 
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, possibility: float = 1.0) -> None:
+    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
         self.tp = tp
         self.sl = sl
-        self.possibility = possibility
+        self.confidence = confidence
+        self.symbol = symbol
         self.key = "close_sell"
-        self.trend = Trend()
+        self.trend = Trend(TREND_TYPE.down)
         self.id = -11
         self.order_type = ORDER_TYPE.market
         self.is_buy = False
@@ -204,35 +212,36 @@ class CloseSellSignal(Signal):
 
 
 class ValueRangeSignal(Signal):
-    def __init__(self, std_name, pricees: list, possibilities: list = None, amount=1) -> None:
+    def __init__(self, std_name, pricees: list, possibilities: list = None, amount=1, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = pricees  # [High, Low]
         self.amount = amount
-        self.possibility = possibilities
-        self.key = ("value_range",)
-        self.trend = Trend()
+        self.confidence = possibilities
+        self.key = "value_range"
+        self.trend = Trend(TREND_TYPE.range)
         self.id = 100
         self.order_type = None
         self.is_buy = None
+        self.symbol = symbol
 
 
 class SignalInfo:
     def __init__(
-        self, trend: Trend, is_buy: bool, order_type: str = "Market", amount=1, tp=None, sl=None, price: float = None, possibility: float = 1.0
+        self, trend: Trend, is_buy: bool, order_type: str = "Market", amount=1, tp=None, sl=None, price: float = None, confidence: float = 1.0, symbol=None
     ):
         self.trend = trend
         if is_buy:
             if order_type == ORDER_TYPE.market or order_type == "Market" or order_type == ORDER_TYPE.market.value:
-                self.signal = BuySignal(amount=amount, tp=tp, sl=sl, possibility=possibility)
+                self.signal = BuySignal(amount=amount, tp=tp, sl=sl, confidence=confidence, symbol=symbol)
             elif order_type == "Pending":
-                self.signal = BuyPendingOrderSignal(amount=amount, price=price, tp=tp, sl=sl, possibility=possibility)
+                self.signal = BuyPendingOrderSignal(amount=amount, price=price, tp=tp, sl=sl, confidence=confidence, symbol=symbol)
         elif is_buy is False:
             if order_type == ORDER_TYPE.market or order_type == "Market" or order_type == ORDER_TYPE.market.value:
-                self.signal = SellSignal(amount=amount, tp=tp, sl=sl, possibility=possibility)
+                self.signal = SellSignal(amount=amount, tp=tp, sl=sl, confidence=confidence, symbol=symbol)
             elif order_type == "Pending":
-                self.signal = SellPendingOrderSignal(price=price, tp=tp, sl=sl, possibility=possibility)
+                self.signal = SellPendingOrderSignal(price=price, tp=tp, sl=sl, confidence=confidence, symbol=symbol)
         elif type(price) == list:
-            self.signal = ValueRangeSignal(pricees=price, tp=tp, sl=sl, possibilities=possibility)
+            self.signal = ValueRangeSignal(pricees=price, tp=tp, sl=sl, possibilities=confidence, symbol=symbol)
         else:
             raise Exception(f"unkown signal info:: is_buy:{is_buy}, price: {price}")
 
@@ -242,9 +251,9 @@ def update_signal_with_close(signal: Signal, continuous_mode: str = None, std_na
         std_name = signal.std_name
 
     if isinstance(signal, BuySignal):
-        return CloseBuySignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, possibility=signal.possibility)
+        return CloseBuySignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, confidence=signal.confidence, symbol=signal.symbol)
     elif isinstance(signal, SellSignal):
-        return CloseSellSignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, possibility=signal.possibility)
+        return CloseSellSignal(std_name, amount=signal.amount, price=signal.order_price, tp=signal.tp, sl=signal.sl, confidence=signal.confidence, symbol=signal.symbol)
     elif signal is None:
         if continuous_mode is None:
             return CloseSignal(std_name=std_name)

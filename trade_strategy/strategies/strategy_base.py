@@ -4,9 +4,8 @@ from typing import Union
 
 from finance_client.client_base import ClientBase
 
-from ..signal import Signal
+from ..signal import Signal, Trend
 from logging import getLogger, config
-from trade_strategy.signal import Signal
 
 
 class StrategyClient:
@@ -50,11 +49,12 @@ class StrategyClient:
         self.amount = amount
         self.client = finance_client
         self.data_length = data_length
+        self.market_trends = {}
         if interval_mins is None:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins
-        self.trends = {}  # 0 don't have, 1 have long_position, -1 short_position
+        self.position_trends = {}  # 0 don't have, 1 have long_position, -1 short_position
 
     def add_indicaters(self, idc_processes: list):
         for process in idc_processes:
@@ -69,7 +69,10 @@ class StrategyClient:
 
     def update_trend(self, signal: Signal):
         if signal is not None:
-            self.trends[signal.symbol] = signal.trend
+            self.position_trends[signal.symbol] = signal.trend
+
+    def set_market_trend(self, symbol:str, market_trend: Trend):
+        self.market_trends[symbol] = market_trend
 
     def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
@@ -99,8 +102,8 @@ class StrategyClient:
 
         for symbol in symbols:
             if long_short is None:
-                if symbol in self.trends:
-                    position = self.trends[symbol].id
+                if symbol in self.position_trends:
+                    position = self.position_trends[symbol].id
                 else:
                     position = 0
             else:
@@ -170,8 +173,8 @@ class MultiSymbolStrategyClient(StrategyClient):
         if positions is None:
             positions = []
             for symbol in symbols:
-                if symbol in self.trends:
-                    positions.append(self.trends[symbol].id)
+                if symbol in self.position_trends:
+                    positions.append(self.position_trends[symbol].id)
                 else:
                     positions.append(0)
 
