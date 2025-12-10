@@ -10,7 +10,7 @@ from .strategies import StrategyClient
 
 
 class ParallelStrategyManager:
-    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, pipeline=None, logger=None) -> None:
+    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, pipeline=None, logger=None, symbols=None) -> None:
         self.event = threading.Event()
         self.pipeline = pipeline
         if logger is None:
@@ -40,6 +40,14 @@ class ParallelStrategyManager:
             for strategy in strategies:
                 self.results[strategy.key] = []
         self.done = False
+        if isinstance(symbols, list):
+            self.symbols = symbols
+        elif isinstance(symbols, str):
+            self.symbols = [symbols]
+        elif symbols is None:
+            self.symbols = None
+        else:
+            raise TypeError(f"symbols should be list or str, but got {type(symbols)}")
 
     def __start_strategy(self, strategy: StrategyClient):
         interval_mins = strategy.interval_mins
@@ -64,16 +72,16 @@ class ParallelStrategyManager:
         sellSignalCount = 0
         closedCount = 0
         closedByPendingCount = 0
-        symbols = strategy.client.symbols.copy()
-        for symbol in symbols:
+        if self.symbols is None:
+            self.symbols = strategy.client.symbols.copy()
+        for symbol in self.symbols:
             self.results[symbol] = []
 
         while datetime.datetime.now() < self.__end_time and self.done is False:
-            symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
             if self.pipeline:
-                self.pipeline.before_signal(strategy, symbols)
-            signals = strategy.run(symbols)
+                self.pipeline.before_signal(strategy, self.symbols)
+            signals = strategy.run(self.symbols)
             if self.pipeline:
                 signals = self.pipeline.after_signal(signals)
             end_time = datetime.datetime.now()
@@ -153,7 +161,7 @@ class ParallelStrategyManager:
                 print(strategy.client.get_budget())
             count += 1
 
-        for symbol in symbols:
+        for symbol in self.symbols:
             totalSignalCount = len(self.results[symbol])
             if totalSignalCount != 0:
                 revenue = sum(self.results[symbol])

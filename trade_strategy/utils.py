@@ -73,15 +73,19 @@ def refine_signal(org_signal: signal.Signal, signal_dict: dict) -> signal.Signal
     if is_buy:
         if org_is_close:
             new_signal = signal.CloseSignal(std_name=org_std_name, price=price, symbol=symbol, confidence=confidence)
-        elif "limit" in order_type.lower() or "stop" in order_type.lower():
+        elif "limit" in order_type.lower():
             new_signal = signal.BuyPendingOrderSignal(std_name=org_std_name, price=price, amount=org_amount, sl=stop_loss, tp=take_profit, symbol=symbol, confidence=confidence)
+        elif "stop" in order_type.lower():
+            new_signal = signal.BuyPendingOrderSignal(std_name=org_std_name, price=price, amount=org_amount, sl=stop_loss, tp=take_profit, symbol=symbol, order_type=signal.ORDER_TYPE.stop, confidence=confidence)
         else:
             new_signal = signal.BuySignal(std_name=org_std_name, price=price, amount=org_amount, symbol=symbol, sl=stop_loss, tp=take_profit, confidence=confidence)
     elif is_sell:
         if org_is_close:
             new_signal = signal.CloseSignal(std_name=org_std_name, price=price, symbol=symbol, confidence=confidence)
-        elif "limit" in order_type.lower() or "stop" in order_type.lower():
+        elif "limit" in order_type.lower():
             new_signal = signal.SellPendingOrderSignal(std_name=org_std_name, price=price, amount=org_amount, sl=stop_loss, tp=take_profit, symbol=symbol, confidence=confidence)
+        elif "stop" in order_type.lower():
+            new_signal = signal.SellPendingOrderSignal(std_name=org_std_name, price=price, amount=org_amount, sl=stop_loss, tp=take_profit, symbol=symbol, order_type=signal.ORDER_TYPE.stop, confidence=confidence)
         else:
             new_signal = signal.SellSignal(std_name=org_std_name, price=price, amount=org_amount, symbol=symbol, sl=stop_loss, tp=take_profit, confidence=confidence)
     else:

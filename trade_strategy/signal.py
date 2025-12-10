@@ -124,7 +124,7 @@ class SellSignal(Signal):
 
 
 class BuyPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None, order_type=ORDER_TYPE.limit) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -134,13 +134,13 @@ class BuyPendingOrderSignal(Signal):
         self.key = "buy_pending"
         self.trend = Trend(TREND_TYPE.up)
         self.id = 2
-        self.order_type = "Pending"
+        self.order_type = order_type
         self.is_buy = True
         self.symbol = symbol
 
 
 class SellPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None, order_type=ORDER_TYPE.limit) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -150,7 +150,7 @@ class SellPendingOrderSignal(Signal):
         self.key = "sell_order"
         self.trend = Trend(TREND_TYPE.down)
         self.id = -2
-        self.order_type = "Pending"
+        self.order_type = order_type
         self.is_buy = False
         self.symbol = symbol
 

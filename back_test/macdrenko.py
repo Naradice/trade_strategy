@@ -1,11 +1,11 @@
 import os, json, sys, datetime
 
+
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(module_path)
 import trade_strategy as ts
 from finance_client.csv.client import CSVClient
 from finance_client import db
-from finance_client.mt5 import MT5Client
 from finance_client.fprocess.fprocess.idcprocess import *
 
 from logging import getLogger, config
@@ -23,29 +23,20 @@ logger_config["handlers"]["fileHandler"]["filename"] = log_path
 config.dictConfig(logger_config)
 logger = getLogger("trade_strategy.back_test")
 
-# file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../stocknet/finance_client/finance_client/data_source/csv/USDJPY_forex_min30.csv'))
-# date_column = "Time"
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_min30.csv")
-# frame = 30
-file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_h1.csv")
+file_path = os.path.abspath("L:/data/fx/OANDA-Japan MT5 Live/mt5_USDJPY_h1.csv")
 frame = 60
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_h2.csv')
-# frame = 120
-# file_path = os.path.abspath("L:/data/mt5/OANDA-Japan MT5 Live/mt5_USDJPY_d1.csv")
-# frame = 60*24
 date_column = "time"
 ohlc_columns = ["open", "high", "low", "close"]
 
 
 def MACDRenko(slope=5):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
-    storage = db.SQLiteStorage("./back_test.db", "csv", ldb)
+    storage = db.SQLiteStorage("./back_test.db", "csv", "back_test", ldb)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
         frame=frame,
         start_index=120,
-        logger=logger,
         columns=ohlc_columns,
         date_column=date_column,
         slip_type="percent",
@@ -59,38 +50,38 @@ def MACDRenko(slope=5):
     manager.start_strategies()
 
 
-def MACDRenkoByBBCSV(slope=5):
+def MACDRenkoByBBCSV(slope=5, window=20):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
-    storage = db.SQLiteStorage("./back_test.db", "csv", ldb)
+    storage = db.SQLiteStorage("./back_test.db", "csv", "back_test", ldb)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
         frame=frame,
-        start_index=120,
-        logger=logger,
+        start_index=250,
         columns=ohlc_columns,
         date_column=date_column,
         slip_type="percent",
         storage=storage,
     )
     columns = client.get_ohlc_columns()
-    bband_process = BBANDProcess(target_column=columns["Close"], alpha=3)
+
+    bband_process = BBANDProcess(target_column=columns["Close"], window=window)
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
+    # BBAN std require 200 for data length
     st1 = ts.strategies.MACDRenkoSLByBB(client, renko_p, macd_p, slope_window=slope, bolinger_process=bband_process,
-                                         interval_mins=0, data_length=120, logger=logger)
+                                         interval_mins=0, data_length=250, logger=logger)
     manager = ts.ParallelStrategyManager([st1], minutes=30, logger=logger)
     manager.start_strategies()
 
 def MACDRenkoRangeCSV(slope=5):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
-    storage = db.SQLiteStorage("./back_test.db", "csv", ldb)
+    storage = db.SQLiteStorage("./back_test.db", "csv", "back_test", ldb)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
         frame=frame,
         start_index=150,
-        logger=logger,
         columns=ohlc_columns,
         date_column=date_column,
         slip_type="percent",
@@ -107,13 +98,12 @@ def MACDRenkoRangeCSV(slope=5):
 
 def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
-    storage = db.SQLiteStorage("./back_test.db", "csv", ldb)
+    storage = db.SQLiteStorage("./back_test.db", "csv", "back_test", ldb)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
         frame=frame,
         start_index=150,
-        logger=logger,
         columns=ohlc_columns,
         date_column=date_column,
         slip_type="percent",
@@ -134,7 +124,7 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
 
 
 if __name__ == "__main__":
-    MACDRenko(2)
-    # MACDRenkoByBBCSV(slope=2)
+    # MACDRenko(20)
+    MACDRenkoByBBCSV(slope=5, window=14)
     # MACDRenkoRangeCSV(slope=2)
     # MACDRenkoRangeSLCSV(slope_window=2, use_tp=False)
