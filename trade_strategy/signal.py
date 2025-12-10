@@ -82,17 +82,17 @@ class Signal:
         symbol = parameters.get("symbol", None)
 
         if id == 1:
-            return BuySignal("", amount, price, tp, sl, confidence, symbol)
+            return BuySignal(std_name="", price=price, symbol=symbol, amount=amount, tp=tp, sl=sl, confidence=confidence)
         elif id == -1:
-            return SellSignal("", amount, price, tp, sl, confidence, symbol)
+            return SellSignal(std_name="", price=price, symbol=symbol, amount=amount, tp=tp, sl=sl, confidence=confidence)
         elif id == 10:
-            return CloseSignal("", price, confidence, symbol)
+            return CloseSignal(std_name="", price=price, confidence=confidence, symbol=symbol)
         else:
             print("this id is not supported for now.")
 
 
 class BuySignal(Signal):
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name:str, price:float, symbol:str = None, amount=1, tp=None, sl=None, confidence: float = 1.0) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -108,7 +108,7 @@ class BuySignal(Signal):
 
 
 class SellSignal(Signal):
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name:str, price: float, symbol:str = None, amount=1, tp=None, sl=None, confidence: float = 1.0) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -124,7 +124,7 @@ class SellSignal(Signal):
 
 
 class BuyPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None, order_type=ORDER_TYPE.limit) -> None:
+    def __init__(self, std_name:str, price: float, symbol:str = None, amount=1, tp=None, sl=None, confidence: float = 1.0, order_type=ORDER_TYPE.limit) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -140,7 +140,7 @@ class BuyPendingOrderSignal(Signal):
 
 
 class SellPendingOrderSignal(Signal):
-    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None, order_type=ORDER_TYPE.limit) -> None:
+    def __init__(self, std_name:str, price: float, symbol:str = None, amount=1, tp=None, sl=None, confidence: float = 1.0, order_type=ORDER_TYPE.limit) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount
@@ -158,7 +158,7 @@ class SellPendingOrderSignal(Signal):
 class CloseSignal(Signal):
     "signal to close all position"
 
-    def __init__(self, std_name, price: float = None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name:str, price: float = None, confidence: float = 1.0, symbol:str = None) -> None:
         super().__init__(std_name)
 
         self.order_price = price
@@ -195,7 +195,7 @@ class CloseBuySignal(Signal):
 class CloseSellSignal(Signal):
     "signal to close short position"
 
-    def __init__(self, std_name, amount=1, price: float = None, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
+    def __init__(self, std_name, price: float, amount=1, tp=None, sl=None, confidence: float = 1.0, symbol=None) -> None:
         super().__init__(std_name)
         self.order_price = price
         self.amount = amount

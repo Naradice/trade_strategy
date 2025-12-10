@@ -34,7 +34,7 @@ class Test(unittest.TestCase):
         pipe.before_signal(strategy=strategy, symbols=symbol)
         self.assertIn(symbol, strategy.market_trends)
         print(strategy.market_trends[symbol])
-        sample_signal = signal.BuySignal(strategy.key, symbol=symbol)
+        sample_signal = signal.BuySignal(strategy.key, symbol=symbol, price=None)
         refined_signal = pipe.after_signal([sample_signal])
         self.assertIsInstance(refined_signal, list)
         self.assertGreaterEqual(len(refined_signal), 0)

@@ -70,7 +70,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(trend_obj.strength, "low")
 
     def test_refine_signal_buy_to_buy(self):
-        signal_item = signal.BuySignal("test_strategy", symbol="1333.T")
+        signal_item = signal.BuySignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Buy",
             "order_type": "market",
@@ -86,7 +86,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_sell_to_sell(self):
-        signal_item = signal.SellSignal("test_strategy", symbol="1333.T")
+        signal_item = signal.SellSignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Sell",
             "order_type": "market",
@@ -102,7 +102,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
     
     def test_refine_signal_close_to_close(self):
-        signal_item = signal.CloseSignal("test_strategy", symbol="1333.T")
+        signal_item = signal.CloseSignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Buy",
             "order_type": "market",
@@ -118,7 +118,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
     
     def test_refine_signal_buy_to_sell(self):
-        signal_item = signal.BuySignal("test_strategy", symbol="1333.T")
+        signal_item = signal.BuySignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Sell",
             "order_type": "market",
@@ -134,7 +134,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_sell_to_buy(self):
-        signal_item = signal.SellSignal("test_strategy", symbol="1333.T")
+        signal_item = signal.SellSignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Buy",
             "order_type": "market",
@@ -150,7 +150,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_buy_to_pending_buy(self):
-        signal_item = signal.BuySignal("test_strategy", symbol="1333.T")
+        signal_item = signal.BuySignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Buy",
             "order_type": "limit",
@@ -166,7 +166,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_buy_to_pending_sell(self):
-        signal_item = signal.BuySignal("test_strategy", symbol="1333.T")
+        signal_item = signal.BuySignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Sell",
             "order_type": "limit",
@@ -182,7 +182,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_sell_to_pending_buy(self):
-        signal_item = signal.SellSignal("test_strategy", symbol="1333.T")
+        signal_item = signal.SellSignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Buy",
             "order_type": "limit",
@@ -198,7 +198,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(refined_signal.order_price, 120.15)
 
     def test_refine_signal_sell_to_pending_sell(self):
-        signal_item = signal.SellSignal("test_strategy", symbol="1333.T")
+        signal_item = signal.SellSignal("test_strategy", symbol="1333.T", price=None)
         signal_dict = {
             "signal": "Sell",
             "order_type": "limit",

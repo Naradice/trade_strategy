@@ -6,7 +6,7 @@ BASE_PATH = os.path.join(os.path.dirname(__file__), "..")
 # for finance_client
 module_path = os.path.abspath(f"{BASE_PATH}/../finance_client")
 sys.path.append(module_path)
-import finance_client.fprocess.fprocess.idcprocess as idp
+from finance_client.fprocess.fprocess import idcprocess as idp
 from finance_client.csv.client import CSVClient
 
 sys.path.append(BASE_PATH)

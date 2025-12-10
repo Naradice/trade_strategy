@@ -69,7 +69,7 @@ class StrategyClient:
 
     def update_trend(self, signal: Signal):
         if signal is not None:
-            self.position_trends[signal.symbol] = signal.trend
+            self.position_trends[signal.symbol] = signal
 
     def set_market_trend(self, symbol:str, market_trend: Trend):
         self.market_trends[symbol] = market_trend
@@ -103,9 +103,9 @@ class StrategyClient:
         for symbol in symbols:
             if long_short is None:
                 if symbol in self.position_trends:
-                    position = self.position_trends[symbol].id
+                    position = self.position_trends[symbol]
                 else:
-                    position = 0
+                    position = None
             else:
                 position = long_short
             ohlc_df = get_dataframe(df, symbol)
@@ -139,7 +139,7 @@ class MultiSymbolStrategyClient(StrategyClient):
     ) -> None:
         super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
 
-    def get_signal(self, df, position: int = None, symbols=None):
+    def get_signal(self, df, position = None, symbols=None):
         if symbols is None:
             symbols = []
         return self.get_signals(df, [position], symbols)
@@ -174,9 +174,9 @@ class MultiSymbolStrategyClient(StrategyClient):
             positions = []
             for symbol in symbols:
                 if symbol in self.position_trends:
-                    positions.append(self.position_trends[symbol].id)
+                    positions.append(self.position_trends[symbol])
                 else:
-                    positions.append(0)
+                    positions.append(None)
 
         signals = self.get_signals(df, positions, symbols)
         for signal in signals:

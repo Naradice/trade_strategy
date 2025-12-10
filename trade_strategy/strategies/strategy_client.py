@@ -50,9 +50,9 @@ class SlopeChange(StrategyClient):
     def get_required_idc_param_keys(self):
         return {}
 
-    def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
+    def get_signal(self, df, position = None, symbols=...) -> Signal:
         signal, self.__in_range = strategy.slope_change(
-            long_short,
+            position,
             df,
             slope_column=self.slope_column,
             short_ema_column=self.short_ema_column,
@@ -224,7 +224,7 @@ class MACDRenko(StrategyClient):
 
     def get_signal(self, df: pd.DataFrame, position, symbol: str):
         
-        if position == 0:
+        if position is None:
             if self.bolinger_threshold is not None:
                 current_price = df[self.order_price_column].iloc[-1]
                 upper_price = df[self.bh_column].iloc[-1]
