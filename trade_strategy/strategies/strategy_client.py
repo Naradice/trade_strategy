@@ -1,7 +1,6 @@
-import json
-
 import finance_client as fc
 import pandas as pd
+from finance_client.position import Position
 
 from trade_strategy.signal import Signal
 
@@ -50,7 +49,7 @@ class SlopeChange(StrategyClient):
     def get_required_idc_param_keys(self):
         return {}
 
-    def get_signal(self, df, position = None, symbols=...) -> Signal:
+    def get_signal(self, df, position: Position = None, symbols=...) -> Signal:
         signal, self.__in_range = strategy.slope_change(
             position,
             df,
@@ -128,7 +127,7 @@ class MACDCross(StrategyClient):
         self.current_trend = 0
         self.add_indicaters([macd])
 
-    def get_signal(self, data, position, symbol: str):
+    def get_signal(self, data, position: Position = None, symbol: str = None):
         signal, tick_trend = strategy.macd_cross(
             position, self.current_trend, data, self.close_column_name, self.signal_column_name, self.macd_column_name
         )
@@ -222,7 +221,7 @@ class MACDRenko(StrategyClient):
             rsi_column = rsi_p.KEY_RSI
             self.rsi_column = rsi_column
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         
         if position is None:
             if self.bolinger_threshold is not None:
@@ -338,7 +337,7 @@ class MACDRenkoSLByBB(MACDRenko):
         self.use_tp = use_tp
         self.column_dict = self.client.get_ohlc_columns()
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         ask_value = self.client.get_current_ask(symbol)
         bid_value = self.client.get_current_bid(symbol)
         signal = strategy.macd_renko_bb(
@@ -420,7 +419,7 @@ class CCICross(StrategyClient):
             self.trend = Trend(TREND_TYPE.down)
         self.add_indicaters(indicaters)
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal = strategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
         return signal
 
@@ -499,7 +498,7 @@ class CCIBoader(StrategyClient):
             self.trend = Trend(TREND_TYPE.unknown)
         self.add_indicaters(indicaters)
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal = strategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)
         return signal
 
@@ -563,7 +562,7 @@ class RangeTrade(StrategyClient):
         self.__tp_threrad = slope_ratio
         self.add_indicaters(indicaters)
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal = strategy.range_experimental(
             position,
             df,
@@ -663,7 +662,7 @@ class MACDRenkoRange(StrategyClient):
         self.BLow_column = bband_process.KEY_LOWER_VALUE
         self.add_indicaters([renko_process, bband_process, macd_process, macd_slope, signal_slope, range_process])
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal, self.__is_in_range = strategy.macd_renko_range_ex(
             position,
             df,
@@ -785,7 +784,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         self.column_dict = self.client.get_ohlc_columns()
         self.__is_in_range = False
 
-    def get_signal(self, df: pd.DataFrame, position, symbol: str):
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal, self.__is_in_range = strategy.macd_renkorange_bb_ex(
             position,
             df,
@@ -843,7 +842,7 @@ class Momentum(StrategyClient):
         self.risk_factor = risk_factor
         super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
 
-    def get_signals(self, df, positions, symbols):
+    def get_signals(self, df, positions: list[Position] = None, symbols: list[str] = None):
         signals = strategy.momentum_ma(
             positions,
             df,

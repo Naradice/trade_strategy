@@ -1,8 +1,10 @@
 import json
 import os
+from turtle import position
 from typing import Union
 
 from finance_client.client_base import ClientBase
+from finance_client.position import Position
 
 from ..signal import Signal, Trend
 from logging import getLogger, config
@@ -54,7 +56,6 @@ class StrategyClient:
             self.interval_mins = self.client.frame
         else:
             self.interval_mins = interval_mins
-        self.position_trends = {}  # 0 don't have, 1 have long_position, -1 short_position
 
     def add_indicaters(self, idc_processes: list):
         for process in idc_processes:
@@ -67,22 +68,18 @@ class StrategyClient:
         # time, signal info, data
         pass
 
-    def update_trend(self, signal: Signal):
-        if signal is not None:
-            self.position_trends[signal.symbol] = signal
-
     def set_market_trend(self, symbol:str, market_trend: Trend):
         self.market_trends[symbol] = market_trend
 
-    def get_signal(self, df, long_short: int = None, symbols=...) -> Signal:
+    def get_signal(self, df, position: Position = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
         return None
 
-    def run(self, symbols: Union[str, list], long_short=None) -> Signal:
+    def run(self, symbols: Union[str, list]) -> Signal:
         """run this strategy
 
         Args:
-            long_short (int, optional): represents the trend. When manually or other strategy buy/sell, you can pass 1/-1 to this strategy. Defaults to None.
+            symbols (Union[str, list]): symbols to run this strategy
 
         Returns:
             Signal: Signal of this strategy
@@ -101,28 +98,30 @@ class StrategyClient:
             get_dataframe = lambda df, key: df[key]
 
         for symbol in symbols:
-            if long_short is None:
-                if symbol in self.position_trends:
-                    position = self.position_trends[symbol]
-                else:
-                    position = None
-            else:
-                position = long_short
             ohlc_df = get_dataframe(df, symbol)
             if ohlc_df.empty:
                 print("ohlc_df is empty. skipping...", symbol)
                 continue
             if ohlc_df.iloc[-1].isnull().any() is True:
                 print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
-            signal = self.get_signal(ohlc_df, position, symbol)
-            if signal is not None:
-                signal.amount = self.amount
-                signal.symbol = symbol
-                self.update_trend(signal)
-                signals.append(signal)
-                if self.save_signal_info:
-                    self.save_signal(signal, ohlc_df)
-
+            positions = self.client.get_positions(symbols=symbols)
+            if len(positions) == 0:
+                signal = self.get_signal(ohlc_df, None, symbol)
+                if signal is not None:
+                    signal.amount = self.amount
+                    signal.symbol = symbol
+                    signals.append(signal)
+                    if self.save_signal_info:
+                        self.save_signal(signal, ohlc_df)
+            else:
+                for position in positions:
+                    signal = self.get_signal(ohlc_df, position, symbol)
+                    if signal is not None:
+                        signal.amount = self.amount
+                        signal.symbol = symbol
+                        signals.append(signal)
+                        if self.save_signal_info:
+                            self.save_signal(signal, ohlc_df)
         return signals
 
 
@@ -170,18 +169,11 @@ class MultiSymbolStrategyClient(StrategyClient):
         if type(symbols) is str:
             symbols = [symbols]
 
-        if positions is None:
-            positions = []
-            for symbol in symbols:
-                if symbol in self.position_trends:
-                    positions.append(self.position_trends[symbol])
-                else:
-                    positions.append(None)
+        positions = self.client.get_positions(symbols=symbols) if positions is None else positions
 
         signals = self.get_signals(df, positions, symbols)
         for signal in signals:
             if signal is not None:
-                self.update_trend(signal)
                 signals.append(signal)
                 if self.save_signal_info:
                     self.save_signal(signal, df)
