@@ -7,6 +7,7 @@ import trade_strategy as ts
 from finance_client.csv.client import CSVClient
 from finance_client import db
 from finance_client.fprocess.fprocess.idcprocess import *
+from finance_client import fprocess
 
 from logging import getLogger, config
 
@@ -29,7 +30,7 @@ date_column = "time"
 ohlc_columns = ["open", "high", "low", "close"]
 
 
-def MACDRenko(slope=5):
+def MACDRenko(slope=5, threshold=2, atr_window=14, range_function=None):
     ldb = db.LogCSVStorage(f"./back_test_USDJPY_{frame}.csv")
     storage = db.SQLiteStorage("./back_test.db", "csv", "back_test", ldb)
     client = CSVClient(
@@ -43,10 +44,11 @@ def MACDRenko(slope=5):
         storage=storage,
     )
     macd_p = MACDProcess(short_window=12, long_window=26, signal_window=9, target_column=ohlc_columns[3])
-    renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
-    st1 = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope, interval_mins=0, data_length=120, logger=logger,
-                                  rsi_threshold=(80, 20))
-    manager = ts.ParallelStrategyManager([st1], minutes=60, logger=logger)
+    renko_p = RenkoProcess(window=atr_window, ohlc_column=ohlc_columns)
+    st1 = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope, 
+                                  interval_mins=0, data_length=120, logger=logger, threshold=threshold,
+                                  range_function=range_function)
+    manager = ts.ParallelStrategyManager([st1], minutes=10, logger=logger)
     manager.start_strategies()
 
 
@@ -71,7 +73,7 @@ def MACDRenkoByBBCSV(slope=5, window=20):
     # BBAN std require 200 for data length
     st1 = ts.strategies.MACDRenkoSLByBB(client, renko_p, macd_p, slope_window=slope, bolinger_process=bband_process,
                                          interval_mins=0, data_length=250, logger=logger)
-    manager = ts.ParallelStrategyManager([st1], minutes=30, logger=logger)
+    manager = ts.ParallelStrategyManager([st1], minutes=10, logger=logger)
     manager.start_strategies()
 
 def MACDRenkoRangeCSV(slope=5):
@@ -92,7 +94,7 @@ def MACDRenkoRangeCSV(slope=5):
     renko_p = RenkoProcess(window=60, ohlc_column=ohlc_columns)
     rtp_p = RangeTrendProcess(slope_window=3)
     st1 = ts.strategies.MACDRenkoRange(client, renko_p, macd_p, rtp_p, slope_window=slope, interval_mins=0, data_length=120, logger=logger)
-    manager = ts.ParallelStrategyManager([st1], minutes=60 * 2, logger=logger)
+    manager = ts.ParallelStrategyManager([st1], minutes=10, logger=logger)
     manager.start_strategies()
 
 
@@ -119,12 +121,13 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
         client, renko_p, macd_p, bband_process, rtp_p, slope_window=slope_window, interval_mins=0, data_length=120, use_tp=use_tp, logger=logger,
         alpha=4, bolinger_threshold=2
     )
-    manager = ts.ParallelStrategyManager([st1], minutes=60 * 2, logger=logger)
+    manager = ts.ParallelStrategyManager([st1], minutes=10, logger=logger)
     manager.start_strategies()
 
 
 if __name__ == "__main__":
-    # MACDRenko(20)
-    MACDRenkoByBBCSV(slope=5, window=14)
+    range_function = lambda df: fprocess.regime.range_detection_by_atr(df, mean_window=100, atr_window=14, range_threshold=0.8, ohlc_columns=ohlc_columns)
+    MACDRenko(0, threshold=1, atr_window=14, range_function=range_function)
+    # MACDRenkoByBBCSV(slope=5, window=14)
     # MACDRenkoRangeCSV(slope=2)
     # MACDRenkoRangeSLCSV(slope_window=2, use_tp=False)

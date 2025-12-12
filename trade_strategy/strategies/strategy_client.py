@@ -163,14 +163,13 @@ class MACDRenko(StrategyClient):
         finance_client: fc.ClientBase,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
-        slope_window=5,
         amount=1,
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
+        slope_window=None,
         logger=None,
-        bolinger_threshold=None,
-        rsi_threshold=None,
+        range_function=None,
     ) -> None:
         super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
 
@@ -196,63 +195,46 @@ class MACDRenko(StrategyClient):
         else:
             self.close_column_name = "Close"
 
-        macd_slope = fc.fprocess.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
-        signal_slope = fc.fprocess.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
-        self.slope_macd_column = macd_slope.KEY_SLOPE
-        self.slope_signal_column = signal_slope.KEY_SLOPE
-
         # when same key of process is already added, the process is ignored
-        indicaters = [renko_process, macd_process, macd_slope, signal_slope]
-        self.add_indicaters(indicaters)
+        indicaters = [renko_process, macd_process]
 
-        self.bolinger_threshold = bolinger_threshold
-        if bolinger_threshold is not None:
-            ohlc_dict = finance_client.get_ohlc_columns()
-            b_process = fc.fprocess.BBANDProcess(alpha=bolinger_threshold, target_column=ohlc_dict["Close"])
-            self.add_indicaters([b_process])
-            self.bh_column = b_process.KEY_UPPER_VALUE
-            self.bl_column = b_process.KEY_LOWER_VALUE
-            self.order_price_column = ohlc_dict["Close"]
-        self.rsi_threshold = rsi_threshold
-        if rsi_threshold is not None:
-            ohlc_dict = finance_client.get_ohlc_columns()
-            rsi_p = fc.fprocess.RSIProcess(ohlc_column_name=list(ohlc_dict.values()))
-            self.add_indicaters([rsi_p])
-            rsi_column = rsi_p.KEY_RSI
-            self.rsi_column = rsi_column
+        if slope_window is not None and slope_window > 0:
+            macd_slope = fc.fprocess.SlopeProcess(key="m", target_column=self.macd_column_column, window=slope_window)
+            signal_slope = fc.fprocess.SlopeProcess(key="s", target_column=self.macd_signal_column, window=slope_window)
+            self.slope_macd_column = macd_slope.KEY_SLOPE
+            self.slope_signal_column = signal_slope.KEY_SLOPE
+            indicaters.extend([macd_slope, signal_slope])
+        else:
+            self.slope_macd_column = None
+            self.slope_signal_column = None
+
+        self.add_indicaters(indicaters)
+        self.range_function = range_function
 
     def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         
-        if position is None:
-            if self.bolinger_threshold is not None:
-                current_price = df[self.order_price_column].iloc[-1]
-                upper_price = df[self.bh_column].iloc[-1]
-                if current_price >= upper_price:
-                    return None
-                else:
-                    lower_price = df[self.bl_column].iloc[-1]
-                    if current_price <= lower_price:
-                        return None
-
-            if self.rsi_threshold is not None:
-                if self.rsi_column is not None:
-                    rsi_value = abs(df[self.rsi_column].iloc[-1])
-                    if rsi_value >= self.rsi_threshold[0]:
-                        return None
-                    elif rsi_value <= self.rsi_threshold[1]:
-                        return None
-                    
-        signal = strategy.macd_renko(
-            position,
-            df,
-            self.renko_bnum_column,
-            self.macd_column_column,
-            self.macd_signal_column,
-            self.slope_macd_column,
-            self.slope_signal_column,
-            self.close_column_name,
-            threshold=self.threshold,
-        )
+        if self.slope_signal_column is not None:
+            signal = strategy.macd_renko_with_slope(
+                position,
+                df,
+                self.renko_bnum_column,
+                self.macd_column_column,
+                self.macd_signal_column,
+                self.slope_macd_column,
+                self.slope_signal_column,
+                self.close_column_name,
+                threshold=self.threshold,
+            )
+        else:
+            signal = strategy.macd_renko(
+                position,
+                df,
+                self.renko_bnum_column,
+                self.macd_column_column,
+                self.macd_signal_column,
+                self.close_column_name,
+                threshold=self.threshold,
+            )
         return signal
 
 

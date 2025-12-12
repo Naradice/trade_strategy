@@ -134,17 +134,68 @@ def macd_renko(
     renko_bnum_column,
     macd_column_column,
     macd_signal_column,
+    order_price_column,
+    threshold=2,
+    range_function=None,
+):
+    key = "macd_renko_slope"
+    long_short = position.position_type.value if position is not None else 0
+    signal = None
+    is_range = range_function(df) if range_function is not None else False
+    if len(df) > 0:
+        last_df = df.iloc[-1]
+        renko_cons_num = df[renko_bnum_column].iloc[-threshold:].sum()
+        if long_short == 0:
+            if (
+                renko_cons_num >= threshold
+                and last_df[macd_column_column] > last_df[macd_signal_column]
+                and not is_range
+            ):
+                signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
+            elif (
+                renko_cons_num <= -threshold
+                and last_df[macd_column_column] < last_df[macd_signal_column]
+                and not is_range
+            ):
+                signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
+        elif long_short == 1:
+            if (renko_cons_num <= -threshold 
+                and last_df[macd_column_column] < last_df[macd_signal_column]
+                and not is_range
+            ):
+                signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
+            elif renko_cons_num <= -threshold / 2:
+                signal = CloseSignal(std_name=key)
+        elif long_short == -1:
+            if (
+                renko_cons_num >= threshold 
+                and last_df[macd_column_column] > last_df[macd_signal_column]
+                and not is_range
+            ):
+                signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
+            elif renko_cons_num >= threshold / 2:
+                signal = CloseSignal(std_name=key)
+    else:
+        print("no data is provided")
+    return signal
+
+def macd_renko_with_slope(
+    position,
+    df: pd.DataFrame,
+    renko_bnum_column,
+    macd_column_column,
+    macd_signal_column,
     slope_macd_column,
     slope_signal_column,
     order_price_column,
     threshold=2,
 ):
-    key = "macd_renko"
+    key = "macd_renko_slope"
     long_short = position.position_type.value if position is not None else 0
     signal = None
     if len(df) > 0:
         last_df = df.iloc[-1]
-        renko_cons_num = df[renko_bnum_column].iloc[-2:].sum()
+        renko_cons_num = df[renko_bnum_column].iloc[-threshold:].sum()
         if long_short == 0:
             if (
                 renko_cons_num >= threshold
@@ -197,7 +248,7 @@ def macd_renko_bb(
     bid_value,
 ):
     key = "macd_renko_bb"
-    signal = macd_renko(
+    signal = macd_renko_with_slope(
         position, df, renko_bnum_column, macd_column_column, macd_signal_column, slope_macd_column, slope_signal_column, order_price_column
     )
 
