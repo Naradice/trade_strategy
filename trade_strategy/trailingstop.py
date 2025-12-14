@@ -51,15 +51,17 @@ class TrailingStopByATR(TrailingStopBase):
             return {}
 
         new_stops = {}
+        close_column = self.ohlc_columns[-1]
+        last_price = df.iloc[-1][close_column]
         latest_atr = atr_series.iloc[-1]
 
         for position in positions:
             if position.position_type.value == 1:  # Long position
-                new_stop = position.price - (self.atr_multiplier * latest_atr)
+                new_stop = last_price - (self.atr_multiplier * latest_atr)
                 if position.sl is None or new_stop > position.sl:
                     new_stops[position.id] = new_stop
             else:
-                new_stop = position.price + (self.atr_multiplier * latest_atr)
+                new_stop = last_price + (self.atr_multiplier * latest_atr)
                 if position.sl is None or new_stop < position.sl:
                     new_stops[position.id] = new_stop
 
