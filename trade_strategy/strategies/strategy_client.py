@@ -30,10 +30,11 @@ class SlopeChange(StrategyClient):
         slope_threshold=5,
         ema_threshold=0.1,
         rsi_threshold=70,
+        trailing_stop=None,
         logger=None,
     ) -> None:
         # TODO: add ema and slope if client doesn't have
-        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, trailing_stop, save_signal_info, logger)
         self.slope_column = slope_column
         self.short_ema_column = short_ema_column
         self.long_ema_column = long_ema_column
@@ -98,7 +99,7 @@ class MACDCross(StrategyClient):
         options.update(idc_options)
         return MACDCross(finance_client=finance_client, **options)
 
-    def __init__(self, finance_client: fc.ClientBase, macd_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
+    def __init__(self, finance_client: fc.ClientBase, macd_process=None, interval_mins: int = 30, data_length=100, trailing_stop=None, logger=None) -> None:
         """When MACD cross up, return buy signal
             When MACD cross down, return sell signal
 
@@ -108,7 +109,7 @@ class MACDCross(StrategyClient):
             data_length (int, optional): length to caliculate the MACD. Defaults to 100.
             macd_process (Process, optional): You can specify specific parameter of MACD Process. Defaults to None.
         """
-        super().__init__(finance_client, [], interval_mins, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, data_length, trailing_stop=trailing_stop, logger=logger)
         if macd_process is None:
             macd = fc.fprocess.MACDProcess()
         else:
@@ -169,9 +170,10 @@ class MACDRenko(StrategyClient):
         threshold=2,
         slope_window=None,
         logger=None,
+        trailing_stop=None,
         range_function=None,
     ) -> None:
-        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
+        super().__init__(finance_client, [], interval_mins, amount, data_length, trailing_stop=trailing_stop, logger=logger)
 
         if renko_process is not None:
             if renko_process.kinds != "Renko":
@@ -187,7 +189,7 @@ class MACDRenko(StrategyClient):
             macd_process = fc.fprocess.MACDProcess(target_column=ohlc_dict["Close"])
         self.macd_column_column = macd_process.KEY_MACD
         self.macd_signal_column = macd_process.KEY_SIGNAL
-        self.renko_bnum_column = renko_process.KEY_BRICK_NUM
+        self.renko_bnum_column = renko_process.KEY_VALUE
         column_dict = self.client.get_ohlc_columns()
         self.threshold = threshold
         if type(column_dict) == dict:
@@ -277,6 +279,7 @@ class MACDRenkoSLByBB(MACDRenko):
         use_tp=False,
         interval_mins: int = -1,
         data_length=250,
+        trailing_stop=None,
         logger=None,
     ) -> None:
         """
@@ -302,6 +305,7 @@ class MACDRenkoSLByBB(MACDRenko):
             interval_mins=interval_mins,
             amount=amount,
             data_length=data_length,
+            trailing_stop=trailing_stop,
             logger=logger,
         )
 
@@ -364,20 +368,22 @@ class CCICross(StrategyClient):
         options.update(idc_options)
         return CCICross(finance_client, **options)
 
-    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, logger=None) -> None:
+    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, amount=1, trailing_stop=None, logger=None) -> None:
         """Raise Buy/Sell signal when CCI cross up/down 0
 
         Args:
             finance_client (fc.Client): any finance_client
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
+            amount (int, optional): amount per trade. Defaults to 1.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
         Raises:
             Exception: when other than CCI process is provided.
         """
-        super().__init__(finance_client, [], interval_mins, data_length, logger)
+        super().__init__(finance_client=finance_client, idc_processes=None, interval_mins=interval_mins, amount=amount,
+                         data_length=data_length, trailing_stop=trailing_stop, logger=logger)
         if cci_process == None:
             cci_process = fc.fprocess.CCIProcess()
         else:
@@ -431,7 +437,7 @@ class CCIBoader(StrategyClient):
         return CCIBoader(finance_client, **options)
 
     def __init__(
-        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, data_length=100, logger=None
+        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, amount=1, data_length=100, trailing_stop=None, logger=None
     ) -> None:
         """Raise Buy/Sell signal when CCI cross up/down uppser/lower
 
@@ -440,6 +446,7 @@ class CCIBoader(StrategyClient):
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             upper (int, option): upper value to raise Buy Signal. Defaults to 100
             lower (int, option): lower value to raise Sell Signal. Defaults to -100
+            amount (int, optional): amount per trade. Defaults to 1.
             interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
@@ -448,7 +455,9 @@ class CCIBoader(StrategyClient):
             Exception: when other than CCI process is provided.
             ValueException: when lower >= upper
         """
-        super().__init__(finance_client, [], interval_mins, data_length, logger)
+        super().__init__(finance_client=finance_client, idc_processes=None, 
+                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         trailing_stop=trailing_stop, logger=logger)
         if lower >= upper:
             raise ValueError("lower should be lower than upper")
         else:
@@ -518,9 +527,12 @@ class RangeTrade(StrategyClient):
         interval_mins: int = -1,
         amount=1,
         data_length: int = 100,
+        trailing_stop=None,
         logger=None,
     ) -> None:
-        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
+        super().__init__(finance_client=finance_client, idc_processes=None, 
+                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         trailing_stop=trailing_stop, logger=logger)
         ohlc_columns = finance_client.get_ohlc_columns()
         self.close_column = ohlc_columns["Close"]
         self.high_column = ohlc_columns["High"]
@@ -599,9 +611,12 @@ class MACDRenkoRange(StrategyClient):
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
+        trailing_stop=None,
         logger=None,
     ) -> None:
-        super().__init__(finance_client, [], interval_mins, amount, data_length, logger)
+        super().__init__(finance_client=finance_client, idc_processes=None, 
+                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         trailing_stop=trailing_stop, logger=logger)
 
         if renko_process.kinds != "Renko":
             raise Exception("renko_process accept only RenkoProcess")
@@ -708,11 +723,12 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         use_tp=False,
         interval_mins: int = -1,
         data_length=250,
-        threshold=2,
-        logger=None,
         bolinger_threshold=None,
         rsi_column=None,
         rsi_threshold=None,
+        threshold=2,
+        trailing_stop=None,
+        logger=None,
     ) -> None:
         """
         add condition to open a position by Bolinger Band
@@ -759,6 +775,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             interval_mins=interval_mins,
             data_length=data_length,
             threshold=threshold,
+            trailing_stop=trailing_stop,
             logger=logger,
         )
 
@@ -812,6 +829,7 @@ class Momentum(StrategyClient):
         amount=1,
         data_length: int = 100,
         save_signal_info=False,
+        trailing_stop=None,
         logger=None,
     ) -> None:
         self.momentum_column = momentum_column
@@ -822,7 +840,9 @@ class Momentum(StrategyClient):
         self.baseline_ma_column = baseline_ma_column
         self.threshold = threshold
         self.risk_factor = risk_factor
-        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        super().__init__(finance_client=finance_client, idc_processes=idc_processes, 
+                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         save_signal_info=save_signal_info, trailing_stop=trailing_stop, logger=logger)
 
     def get_signals(self, df, positions: list[Position] = None, symbols: list[str] = None):
         signals = strategy.momentum_ma(

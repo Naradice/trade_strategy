@@ -21,6 +21,7 @@ class StrategyClient:
         interval_mins: int = None,
         amount=1,
         data_length: int = 100,
+        trailing_stop=None,
         save_signal_info=False,
         logger=None,
     ) -> None:
@@ -51,6 +52,7 @@ class StrategyClient:
         self.amount = amount
         self.client = finance_client
         self.data_length = data_length
+        self.trailing_stop = trailing_stop
         self.market_trends = {}
         if interval_mins is None:
             self.interval_mins = self.client.frame
@@ -73,6 +75,13 @@ class StrategyClient:
 
     def get_signal(self, df, position: Position = None, symbols=...) -> Signal:
         print("please overwrite this method on an actual client.")
+        return None
+    
+    def update_stop(self, df, positions) -> Signal:
+        if self.trailing_stop is not None:
+            new_stops = self.trailing_stop(df, positions)
+            for id, stop_price in new_stops.items():
+                self.client.update_position(position=id, sl=stop_price)
         return None
 
     def run(self, symbols: Union[str, list]) -> Signal:
@@ -97,6 +106,11 @@ class StrategyClient:
         else:
             get_dataframe = lambda df, key: df[key]
 
+        positions = self.client.get_positions(symbols=symbols)
+        self.update_stop(df, positions=positions)
+        if len(positions) > 1:
+            self.logger.debug(f"current positions: {[str(p) for p in positions]}")
+
         for symbol in symbols:
             ohlc_df = get_dataframe(df, symbol)
             if ohlc_df.empty:
@@ -104,8 +118,8 @@ class StrategyClient:
                 continue
             if ohlc_df.iloc[-1].isnull().any() is True:
                 print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
-            positions = self.client.get_positions(symbols=symbols)
-            if len(positions) == 0:
+            symbol_positions = [pos for pos in positions if pos.symbol == symbol]
+            if len(symbol_positions) == 0:
                 signal = self.get_signal(ohlc_df, None, symbol)
                 if signal is not None:
                     signal.amount = self.amount
@@ -114,7 +128,7 @@ class StrategyClient:
                     if self.save_signal_info:
                         self.save_signal(signal, ohlc_df)
             else:
-                for position in positions:
+                for position in symbol_positions:
                     signal = self.get_signal(ohlc_df, position, symbol)
                     if signal is not None:
                         signal.amount = self.amount

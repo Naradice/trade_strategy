@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from finance_client.position import Position
 
@@ -138,19 +139,21 @@ def macd_renko(
     threshold=2,
     range_function=None,
 ):
-    key = "macd_renko_slope"
+    key = "macd_renko"
     long_short = position.position_type.value if position is not None else 0
     signal = None
     is_range = range_function(df) if range_function is not None else False
     if len(df) > 0:
         last_df = df.iloc[-1]
-        renko_cons_num = df[renko_bnum_column].iloc[-threshold:].sum()
+        renko_cons_num = df[renko_bnum_column].diff().replace(0, np.nan).ffill().iloc[-threshold:].sum()
         if long_short == 0:
             if (
                 renko_cons_num >= threshold
                 and last_df[macd_column_column] > last_df[macd_signal_column]
                 and not is_range
             ):
+                print(f"Buy signal is rose: renko_cons_num={renko_cons_num}, macd={last_df[macd_column_column]}, signal={last_df[macd_signal_column]}")
+                print(f"{last_df[macd_column_column] - last_df[macd_signal_column]}")
                 signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif (
                 renko_cons_num <= -threshold
@@ -159,22 +162,31 @@ def macd_renko(
             ):
                 signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
         elif long_short == 1:
-            if (renko_cons_num <= -threshold 
+            # if it is in range, close by range
+            if (is_range):
+                signal = CloseSignal(std_name=key)
+            # if sell signal is rose, close position and open sell position
+            elif (renko_cons_num <= -threshold 
                 and last_df[macd_column_column] < last_df[macd_signal_column]
-                and not is_range
             ):
                 signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
-            elif renko_cons_num <= -threshold / 2:
-                signal = CloseSignal(std_name=key)
+            # if weak sell signal is rose, close position
+            # elif renko_cons_num <= -threshold:
+            #     signal = CloseSignal(std_name=key)
+            # elif last_df[macd_column_column] < last_df[macd_signal_column]:
+            #     signal = CloseSignal(std_name=key)
         elif long_short == -1:
-            if (
-                renko_cons_num >= threshold 
+            if (is_range):
+                signal = CloseSignal(std_name=key)
+            elif (
+                renko_cons_num >= threshold
                 and last_df[macd_column_column] > last_df[macd_signal_column]
-                and not is_range
             ):
                 signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-            elif renko_cons_num >= threshold / 2:
-                signal = CloseSignal(std_name=key)
+            # elif renko_cons_num >= threshold:
+            #     signal = CloseSignal(std_name=key)
+            # elif last_df[macd_column_column] > last_df[macd_signal_column]:
+            #     signal = CloseSignal(std_name=key)
     else:
         print("no data is provided")
     return signal
@@ -189,44 +201,56 @@ def macd_renko_with_slope(
     slope_signal_column,
     order_price_column,
     threshold=2,
+    range_function=None,
 ):
     key = "macd_renko_slope"
     long_short = position.position_type.value if position is not None else 0
+    is_range = range_function(df) if range_function is not None else False
     signal = None
     if len(df) > 0:
         last_df = df.iloc[-1]
-        renko_cons_num = df[renko_bnum_column].iloc[-threshold:].sum()
+        renko_cons_num = df[renko_bnum_column].diff().replace(0, np.nan).ffill().iloc[-threshold:].sum()
         if long_short == 0:
             if (
                 renko_cons_num >= threshold
                 and last_df[macd_column_column] > last_df[macd_signal_column]
                 and last_df[slope_macd_column] > last_df[slope_signal_column]
+                and not is_range
             ):
                 signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif (
                 renko_cons_num <= -threshold
                 and last_df[macd_column_column] < last_df[macd_signal_column]
                 and last_df[slope_macd_column] < last_df[slope_signal_column]
+                and not is_range
             ):
                 signal = SellSignal(std_name=key, price=df[order_price_column].iloc[-1])
         elif long_short == 1:
-            if (
-                renko_cons_num <= -threshold / 2
+            if is_range:
+                signal = CloseSignal(std_name=key)
+            elif (
+                renko_cons_num <= -threshold
                 and last_df[macd_column_column] < last_df[macd_signal_column]
                 and last_df[slope_macd_column] < last_df[slope_signal_column]
             ):
                 signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
-            elif last_df[macd_column_column] < last_df[macd_signal_column] and last_df[slope_macd_column] < last_df[slope_signal_column]:
-                signal = CloseSignal(std_name=key)
+            # elif (last_df[macd_column_column] < last_df[macd_signal_column]):
+            #     signal = CloseSignal(std_name=key)
+            # elif renko_cons_num <= -threshold:
+            #     signal = CloseSignal(std_name=key)
         elif long_short == -1:
-            if (
-                renko_cons_num >= threshold / 2
+            if is_range:
+                signal = CloseSignal(std_name=key)
+            elif (
+                renko_cons_num >= threshold
                 and last_df[macd_column_column] > last_df[macd_signal_column]
                 and last_df[slope_macd_column] > last_df[slope_signal_column]
             ):
                 signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
-            elif last_df[macd_column_column] > last_df[macd_signal_column] and last_df[slope_macd_column] > last_df[slope_signal_column]:
-                signal = CloseSignal(std_name=key)
+            # elif (last_df[macd_column_column] > last_df[macd_signal_column]):
+            #     signal = CloseSignal(std_name=key)
+            # elif renko_cons_num >= threshold:
+            #     signal = CloseSignal(std_name=key)
     else:
         print("no data is provided")
     return signal

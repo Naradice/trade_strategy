@@ -1,3 +1,4 @@
+import csv
 import datetime
 from logging import getLogger, config
 import json
@@ -10,9 +11,10 @@ from .strategies import StrategyClient
 
 
 class ParallelStrategyManager:
-    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, pipeline=None, logger=None, symbols=None) -> None:
+    def __init__(self, strategies: list, days=0, hours=0, minutes=0, seconds=0, pipeline=None, logger=None, symbols=None, result_csv_path=None) -> None:
         self.event = threading.Event()
         self.pipeline = pipeline
+        self.result_csv_path = result_csv_path
         if logger is None:
             dir = os.path.dirname(__file__)
             try:
@@ -168,16 +170,22 @@ class ParallelStrategyManager:
                 winList = list(filter(lambda x: x >= 0, self.results[symbol]))
                 winCount = len(winList)
                 winRevenute = sum(winList)
-                resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+                resultTxt = f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}"
                 self.logger.info(resultTxt)
                 self.logger.info(
                     f"buy signal rose:{buySignalCount}, sell signal raise:{sellSignalCount}, close signal is handled: {closedCount}, closed by market: {closedByPendingCount}"
                 )
                 var = statistics.pvariance(self.results[symbol])
                 mean = statistics.mean(self.results[symbol])
-                self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
-                # TODO: add profit per year
-        print(f"Storategy Ended. Frame: {strategy.client.frame}")
+                self.logger.info(f"strategy assessment: revenue mean: {mean}, var: {var}")
+                if self.result_csv_path is not None:
+                    try:
+                        with open(self.result_csv_path, mode="a", newline="") as f:
+                            writer = csv.writer(f)
+                            writer.writerow([symbol, revenue, totalSignalCount, winCount, winRevenute, mean, var])
+                    except Exception as e:
+                        self.logger.error(f"error occured when writing result csv: {e}")
+        print(f"Strategy Ended. Frame: {strategy.client.frame}")
 
     def start_strategies(self, wait=True):
         self.__start_time = datetime.datetime.now()
