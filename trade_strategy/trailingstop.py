@@ -27,17 +27,19 @@ class TrailingStopBase:
         raise NotImplementedError("Please implement this method in subclass.")
 
 class TrailingStopByATR(TrailingStopBase):
-    def __init__(self, ohlc_columns: list, atr_window: int =14, atr_multiplier: float =3.0):
+    def __init__(self, ohlc_columns: list, atr_window: int =14, atr_multiplier: float =3.0, clip_with_price: bool =False):
         """Apply trailing stop based on ATR for given positions.
 
         Args:
             atr_window (int, optional): Window size for ATR calculation. Defaults to 14.
             atr_multiplier (float, optional): Multiplier for ATR to set stop distance. Defaults to 3.0.
             ohlc_columns (list): List of OHLC column names.
+            clip_with_price (bool, optional): If True, ensures stop does not exceed order price. Defaults to False.
         """
         self.atr_window = atr_window
         self.atr_multiplier = atr_multiplier
         self.ohlc_columns = ohlc_columns
+        self.clip_with_price = clip_with_price
     
     def update_stops(self, df, positions: list[Position], *args, **kwds) -> dict:
         try:
@@ -58,10 +60,14 @@ class TrailingStopByATR(TrailingStopBase):
         for position in positions:
             if position.position_type.value == 1:  # Long position
                 new_stop = last_price - (self.atr_multiplier * latest_atr)
+                if self.clip_with_price and new_stop < position.price:
+                    new_stop = position.price
                 if position.sl is None or new_stop > position.sl:
                     new_stops[position.id] = new_stop
             else:
                 new_stop = last_price + (self.atr_multiplier * latest_atr)
+                if self.clip_with_price and new_stop > position.price:
+                    new_stop = position.price
                 if position.sl is None or new_stop < position.sl:
                     new_stops[position.id] = new_stop
 

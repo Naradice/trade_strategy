@@ -47,7 +47,7 @@ class StrategyClient:
             self.logger = logger
         if not isinstance(idc_processes, list):
             idc_processes = []
-        self.__idc_processes = idc_processes
+        self._idc_processes = idc_processes
         self.save_signal_info = save_signal_info
         self.amount = amount
         self.client = finance_client
@@ -61,8 +61,8 @@ class StrategyClient:
 
     def add_indicaters(self, idc_processes: list):
         for process in idc_processes:
-            if process not in self.__idc_processes:
-                self.__idc_processes.append(process)
+            if process not in self._idc_processes:
+                self._idc_processes.append(process)
             else:
                 self.logger.info(f"{process.kinds} is already added")
 
@@ -94,12 +94,15 @@ class StrategyClient:
             Signal: Signal of this strategy
         """
         try:
-            df = self.client.get_ohlc(symbols=symbols, length=self.data_length, idc_processes=self.__idc_processes)
+            df = self.client.get_ohlc(symbols=symbols, length=self.data_length, idc_processes=self._idc_processes)
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
             return []
+        if df is None or df.empty:
+            self.logger.error("ohlc data is empty.")
+            return []
         signals = []
-        if type(symbols) is str:
+        if isinstance(symbols, str):
             symbols = [symbols]
         if len(symbols) == 1:
             get_dataframe = lambda df, key: df
@@ -175,7 +178,7 @@ class MultiSymbolStrategyClient(StrategyClient):
             Signal: Signal of this strategy
         """
         try:
-            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self.__idc_processes)
+            df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self._idc_processes)
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
             return []
