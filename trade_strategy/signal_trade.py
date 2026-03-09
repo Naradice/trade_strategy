@@ -1,5 +1,6 @@
 import copy
 import datetime
+import logging
 import json
 import os
 import random
@@ -9,19 +10,21 @@ import pandas as pd
 
 from . import strategies
 
+logger = logging.getLogger("trade_strategy.signal_trade")
+
 available_modes = ["rating", "random"]
 
 
 def __close(client: fc.ClientBase, symbol, state):
     symbol = __convert_symbol(symbol)
-    position_type = None
+    position_side = None
     if state == 1:
-        position_type = "ask"
+        position_side = "ask"
     elif state == -1:
-        position_type = "bid"
+        position_side = "bid"
     else:
         print(f"Unkown state: {state} is specified for {symbol}")
-    result = client.close_position(symbol=symbol, position_type=position_type)
+    result = client.close_position(symbol=symbol, position_side=position_side)
     price, position_price, price_diff, profit, suc = result
     return suc, (price, position_price, price_diff, profit)
 
@@ -30,11 +33,11 @@ def __order(client: fc.ClientBase, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
     if signal == "buy" and state == 0:
         print(f"buy order: {symbol}")
-        suc, result = client.open_trade(is_buy=True, amount=1, order_type=0, symbol=symbol)
+        suc, result = client.open_trade(is_buy=True, volume=1, order_type=0, symbol=symbol)
         return suc, result, 1
     elif signal == "sell" and state == 0:
         print(f"sell order: {symbol}")
-        suc, result = client.open_trade(is_buy=False, amount=1, order_type=0, symbol=symbol)
+        suc, result = client.open_trade(is_buy=False, volume=1, order_type=0, symbol=symbol)
         return suc, result, -1
     elif "close" in signal:
         print(f"close order: {symbol}")
@@ -81,7 +84,7 @@ def __random_order(client, signal_df):
     return __signal_order(client, signal_df, symbols)
 
 
-def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
+def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
     if os.path.exists("./symbols_info.json"):
         with open("./symbols_info.json", mode="r") as fp:
             existing_info = json.load(fp)
@@ -130,10 +133,10 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
         existing_rates_df = pd.DataFrame()
         if len(existing_rates) > 0:
             existing_rates_df = pd.DataFrame.from_dict(existing_rates, orient="index")
-            existing_rates_df = existing_rates_df[["mean", "var", "amount"]]
+            existing_rates_df = existing_rates_df[["mean", "var", "volume"]]
         new_ratings_df = pd.DataFrame()
         if len(new_symbols) > 0:
-            ## assume columns=["mean", "var", "amount"], index=symbols
+            ## assume columns=["mean", "var", "volume"], index=symbols
             print("start adding get_rating with a client for new symbols")
             new_ratings_df = client.get_rating(new_symbols)
         else:
@@ -141,7 +144,7 @@ def __add_rating(client, signals, amount_threthold=10, mean_threthold=4):
         rating_df = pd.concat([existing_rates_df, new_ratings_df], axis=0)
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
         if len(rating_df) > 0:
-            candidate_df_all = rating_df[rating_df["amount"] > amount_threthold]
+            candidate_df_all = rating_df[rating_df["volume"] > volume_threthold]
             candidate_df = candidate_df_all[candidate_df_all["mean"] > mean_threthold].copy()
             candidate_df.sort_values(by="var", ascending=True, inplace=True)
             org_index = []
@@ -376,31 +379,17 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
     data_length_ = data_length
     for process in idc_processes:
         data_length_ += process.get_minimum_required_length()
-    for symbol in symbols:
-        _idc_processes = copy.copy(idc_processes)
-        try:
-            client = YahooClient([symbol], adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False)
-        except Exception:
-            print(f"failed to get data of {symbol}. continue with next symbol.")
-            continue
-        strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length": data_length_})
-
-        has_history = False
-        if symbol in signals:
-            state = int(signals[symbol]["state"])
-            has_history = True
-        else:
-            state = 0
-        new_signals = strategy.run(symbol, state)
-        signal_dict = __add_state_to_signal(new_signals, state, symbol)
-        if signal_dict is not None:
-            signals[symbol] = signal_dict
-        elif has_history:
-            if state == 0:
-                print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
-                signals.pop(symbol)
-        del client
-        del _idc_processes
+    _idc_processes = copy.copy(idc_processes)
+    try:
+        client = YahooClient(symbols, adjust_close=adjust_close, frame=frame, start_index=-1, auto_step_index=False, initialize_rate_after_mins=frame)
+    except Exception as e:
+        logger.exception(f"failed to initialize YahooClient: {e}")
+        return signals
+    strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length": data_length_})
+    new_signals = strategy.run(symbols)
+    print(new_signals)
+    del client
+    del _idc_processes
     if save_signals:
         with open("./signals.json", mode="w") as fp:
             json.dump(signals, fp)

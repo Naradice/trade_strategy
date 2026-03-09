@@ -2,7 +2,7 @@ from finance_client import ClientBase
 
 class UnitStrategyClient:
     def __init__(self, symbol: str, open_units: list, close_units: list, finance_client:ClientBase,
-                 length:int, amount: float, threshold: float = 0.5):
+                 length:int, volume: float, threshold: float = 0.5):
         self.symbol = symbol
         self.open_units = open_units
         self.close_units = close_units
@@ -22,7 +22,7 @@ class UnitStrategyClient:
         self.volume_column = volume_column
         self.spread_column = spread_column
         self.length = length
-        self.amount = amount
+        self.volume = volume
         self.threshold = threshold
 
     def execute_strategy(self, data):
@@ -45,11 +45,11 @@ class UnitStrategyClient:
                         spread_column=self.spread_column)
                 if signal >= self.threshold:
                     print("Generate Buy Signal")
-                    self.finance_client.open_trade(is_buy=True, symbol=self.symbol, amount=self.amount)
+                    self.finance_client.open_trade(is_buy=True, symbol=self.symbol, volume=self.volume)
                     break
                 elif signal <= -self.threshold:
                     print("Generate Sell Signal")
-                    self.finance_client.open_trade(is_buy=False, symbol=self.symbol, amount=self.amount)
+                    self.finance_client.open_trade(is_buy=False, symbol=self.symbol, volume=self.volume)
                     break
         else:
             for close_unit in self.close_units:
@@ -60,7 +60,7 @@ class UnitStrategyClient:
                     print(f"Processing close unit: {close_unit}")
                     _positions = positions.copy()
                     for position in _positions:
-                        signal = close_unit(position=position.position_type.value,
+                        signal = close_unit(position=position.position_side.value,
                             price=position.price,
                             data=data,
                             open_column=self.open_column,

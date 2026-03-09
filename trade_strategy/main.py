@@ -36,15 +36,15 @@ class StrategyRunner:
                     if signal.is_buy is None:
                         results = strategy.client.close_all_positions(signal.symbol)
                         if results:
-                            logger.info(f"positions are closed, remaining budget is {strategy.client.wallet.budget}")
+                            logger.info(f"positions are closed, remaining budget is {strategy.client.account.get_free_margin()}")
                     elif signal.is_buy is True:
                         results = strategy.client.close_short_positions(signal.symbol)
                         if results:
-                            logger.info(f"short positions are closed, remaining budget is {strategy.client.wallet.budget}")
+                            logger.info(f"short positions are closed, remaining budget is {strategy.client.account.get_free_margin()}")
                     elif signal.is_buy is False:
                         results = strategy.client.close_long_positions(signal.symbol)
                         if results:
-                            logger.info(f"long positions are closed, remaining budget is {strategy.client.wallet.budget}")
+                            logger.info(f"long positions are closed, remaining budget is {strategy.client.account.get_free_margin()}")
                     if len(results) > 0:
                         for result in results:
                             # (price, position.price, price_diff, profit, True)
@@ -59,7 +59,7 @@ class StrategyRunner:
                     if signal.is_buy:
                         position = strategy.client.open_trade(
                             signal.is_buy,
-                            amount=signal.amount,
+                            volume=signal.volume,
                             price=signal.order_price,
                             tp=signal.tp,
                             sl=signal.sl,
@@ -67,12 +67,12 @@ class StrategyRunner:
                             symbol=signal.symbol,
                         )
                         logger.info(
-                            f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                            f"long position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.account.get_free_margin()}"
                         )
                     elif signal.is_buy is False:
                         position = strategy.client.open_trade(
                             is_buy=signal.is_buy,
-                            amount=signal.amount,
+                            volume=signal.volume,
                             price=signal.order_price,
                             tp=signal.tp,
                             sl=signal.sl,
@@ -80,7 +80,7 @@ class StrategyRunner:
                             symbol=signal.symbol,
                         )
                         logger.info(
-                            f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.wallet.budget}"
+                            f"short position is opened: {str(position)} based on {signal}, remaining budget is {strategy.client.account.get_free_margin()}"
                         )
 
 
@@ -160,7 +160,7 @@ class ParallelStrategyManager:
             if count % 10 == 0:
                 try:
                     print(strategy.client.get_portfolio())
-                    print(strategy.client.get_budget())
+                    print(strategy.client.get_free_margin())
                 except Exception as e:
                     logger.error(f"error occured when getting portfolio or budget: {e}")
             count += 1

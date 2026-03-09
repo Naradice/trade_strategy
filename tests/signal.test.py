@@ -11,13 +11,13 @@ from trade_strategy.signal import BuySignal, SellSignal, CloseBuySignal, CloseSe
 class SignalTest(unittest.TestCase):
     
     def test_update_buysignal_with_close(self):
-        buy_signal = BuySignal("unit_test", amount=1, price=1, symbol="TEST")
+        buy_signal = BuySignal("unit_test", volume=1, price=1, symbol="TEST")
         signal = update_signal_with_close(buy_signal)
         self.assertTrue(isinstance(signal, CloseBuySignal))
         self.assertTrue(signal.is_close and signal.is_buy)
     
     def test_update_sellsignal_with_close(self):
-        _signal = SellSignal("unit_test", amount=1, price=1, symbol="TEST")
+        _signal = SellSignal("unit_test", volume=1, price=1, symbol="TEST")
         signal = update_signal_with_close(_signal)
         self.assertTrue(isinstance(signal, CloseSellSignal))
         self.assertTrue(signal.is_close and signal.is_buy == False)

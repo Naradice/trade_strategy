@@ -1,13 +1,14 @@
 import finance_client as fc
 import pandas as pd
 from finance_client.position import Position
+from finance_client import utils
+from typing import List, List, Union
 
 from trade_strategy.signal import Signal
 
 from .strategy_base import StrategyClient
 from ..signal import *
 from . import strategy
-
 
 # Experimental. You may lose your money.
 class SlopeChange(StrategyClient):
@@ -23,7 +24,7 @@ class SlopeChange(StrategyClient):
         rsi_column,
         idc_processes=[],
         interval_mins: int = -1,
-        amount=1,
+        volume=1,
         data_length: int = 100,
         save_signal_info=False,
         order_price_column="close",
@@ -34,7 +35,7 @@ class SlopeChange(StrategyClient):
         logger=None,
     ) -> None:
         # TODO: add ema and slope if client doesn't have
-        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, trailing_stop, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, volume, data_length, trailing_stop, save_signal_info, logger)
         self.slope_column = slope_column
         self.short_ema_column = short_ema_column
         self.long_ema_column = long_ema_column
@@ -59,7 +60,7 @@ class SlopeChange(StrategyClient):
             long_ema_column=self.long_ema_column,
             bb_width_column=self.bb_width_column,
             rsi_column=self.rsi_column,
-            amount=self.amount,
+            volume=self.volume,
             order_price_column=self.order_price_column,
             slope_threshold=self.slope_threshold,
             ema_threshold=self.ema_threshold,
@@ -99,7 +100,9 @@ class MACDCross(StrategyClient):
         options.update(idc_options)
         return MACDCross(finance_client=finance_client, **options)
 
-    def __init__(self, finance_client: fc.ClientBase, macd_process=None, interval_mins: int = 30, data_length=100, trailing_stop=None, logger=None) -> None:
+    def __init__(self, finance_client: fc.ClientBase, macd_process=None, volume=1,
+                 ohlc_columns=None,
+                 interval_mins: int = 30, data_length=100, trailing_stop=None, logger=None) -> None:
         """When MACD cross up, return buy signal
             When MACD cross down, return sell signal
 
@@ -108,10 +111,14 @@ class MACDCross(StrategyClient):
             interval_mins (int, optional): interval mins to get data. Defaults to -1.
             data_length (int, optional): length to caliculate the MACD. Defaults to 100.
             macd_process (Process, optional): You can specify specific parameter of MACD Process. Defaults to None.
+            volume (int, optional): The volume for the trade signals. Defaults to 1.
         """
-        super().__init__(finance_client, [], interval_mins, data_length, trailing_stop=trailing_stop, logger=logger)
+        super().__init__(finance_client, [], interval_mins, volume=volume, data_length=data_length,
+                          trailing_stop=trailing_stop, logger=logger)
         if macd_process is None:
-            macd = fc.fprocess.MACDProcess()
+            if ohlc_columns is not None:
+                target_column = ohlc_columns[-1]
+            macd = fc.fprocess.MACDProcess(target_column=target_column if ohlc_columns is not None else "Close")
         else:
             if macd_process.kinds == "MACD":
                 macd = macd_process
@@ -126,12 +133,16 @@ class MACDCross(StrategyClient):
         else:
             self.close_column_name = "Close"
         self.current_trend = 0
+        self.volume = volume
         self.add_indicaters([macd])
 
     def get_signal(self, data, position: Position = None, symbol: str = None):
         signal, tick_trend = strategy.macd_cross(
             position, self.current_trend, data, self.close_column_name, self.signal_column_name, self.macd_column_name
         )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         # save trend of macd
         self.current_trend = tick_trend
         return signal
@@ -164,7 +175,7 @@ class MACDRenko(StrategyClient):
         finance_client: fc.ClientBase,
         renko_process: fc.fprocess.RenkoProcess,
         macd_process: fc.fprocess.MACDProcess,
-        amount=1,
+        volume=1,
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
@@ -173,7 +184,7 @@ class MACDRenko(StrategyClient):
         trailing_stop=None,
         range_function=None,
     ) -> None:
-        super().__init__(finance_client, [], interval_mins, amount, data_length, trailing_stop=trailing_stop, logger=logger)
+        super().__init__(finance_client, [], interval_mins, volume, data_length, trailing_stop=trailing_stop, logger=logger)
 
         if renko_process is not None:
             if renko_process.kinds != "Renko":
@@ -237,6 +248,9 @@ class MACDRenko(StrategyClient):
                 self.close_column_name,
                 threshold=self.threshold,
             )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
@@ -275,7 +289,7 @@ class MACDRenkoSLByBB(MACDRenko):
         macd_process: fc.fprocess.MACDProcess,
         bolinger_process: fc.fprocess.BBANDProcess,
         slope_window=5,
-        amount=1,
+        volume=1,
         use_tp=False,
         interval_mins: int = -1,
         data_length=250,
@@ -291,6 +305,7 @@ class MACDRenkoSLByBB(MACDRenko):
             macd_process (fc.fprocess.MACDpreProcess): MACD Process of finance_client module
             bolinger_process (fc.fprocess.BBANDpreProcess): BB Process of finance_client module
             slope_window (int, optional): window to caliculate window of the close. Defaults to 5.
+            volume (int, optional): The volume for the trade signals. Defaults to 1.
             use_tp (bool, optional): Specify a method to add tp vaelue. If not to be specified, "none". Defaults to BB. ["BB", "none", "Fix Ratio"]
             interval_mins (int, optional): update interval. If -1 is specified, use frame of the client. Defaults to -1.
             data_length (int, optional): Length to caliculate the indicaters. Defaults to 250.
@@ -303,7 +318,7 @@ class MACDRenkoSLByBB(MACDRenko):
             macd_process=macd_process,
             slope_window=slope_window,
             interval_mins=interval_mins,
-            amount=amount,
+            volume=volume,
             data_length=data_length,
             trailing_stop=trailing_stop,
             logger=logger,
@@ -341,6 +356,9 @@ class MACDRenkoSLByBB(MACDRenko):
             ask_value,
             bid_value,
         )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
@@ -368,21 +386,21 @@ class CCICross(StrategyClient):
         options.update(idc_options)
         return CCICross(finance_client, **options)
 
-    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, amount=1, trailing_stop=None, logger=None) -> None:
+    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, volume=1, trailing_stop=None, logger=None) -> None:
         """Raise Buy/Sell signal when CCI cross up/down 0
 
         Args:
             finance_client (fc.Client): any finance_client
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
-            amount (int, optional): amount per trade. Defaults to 1.
+            volume (int, optional): volume per trade. Defaults to 1.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
 
         Raises:
             Exception: when other than CCI process is provided.
         """
-        super().__init__(finance_client=finance_client, idc_processes=None, interval_mins=interval_mins, amount=amount,
+        super().__init__(finance_client=finance_client, idc_processes=None, interval_mins=interval_mins, volume=volume,
                          data_length=data_length, trailing_stop=trailing_stop, logger=logger)
         if cci_process == None:
             cci_process = fc.fprocess.CCIProcess()
@@ -409,6 +427,9 @@ class CCICross(StrategyClient):
 
     def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal = strategy.cci_cross(position, df, self.cci_column_name, self.close_column_name)
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
@@ -437,7 +458,7 @@ class CCIBoader(StrategyClient):
         return CCIBoader(finance_client, **options)
 
     def __init__(
-        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, amount=1, data_length=100, trailing_stop=None, logger=None
+        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, volume=1, data_length=100, trailing_stop=None, logger=None
     ) -> None:
         """Raise Buy/Sell signal when CCI cross up/down uppser/lower
 
@@ -446,7 +467,7 @@ class CCIBoader(StrategyClient):
             cci_process (ProcessBase, optional): you can provide CCIProcess. Defaults to None and CCIProcess with default parameter is used.
             upper (int, option): upper value to raise Buy Signal. Defaults to 100
             lower (int, option): lower value to raise Sell Signal. Defaults to -100
-            amount (int, optional): amount per trade. Defaults to 1.
+            volume (int, optional): volume per trade. Defaults to 1.
             interval_mins (int, optional): interval minutes to get_signal this strategy. Defaults to 30.
             data_length (int, optional): data length to caliculate CCI. Defaults to 100.
             logger (Logger, optional): you can specify your logger. Defaults to None.
@@ -456,7 +477,7 @@ class CCIBoader(StrategyClient):
             ValueException: when lower >= upper
         """
         super().__init__(finance_client=finance_client, idc_processes=None, 
-                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         interval_mins=interval_mins, volume=volume, data_length=data_length,
                          trailing_stop=trailing_stop, logger=logger)
         if lower >= upper:
             raise ValueError("lower should be lower than upper")
@@ -491,6 +512,9 @@ class CCIBoader(StrategyClient):
 
     def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
         signal = strategy.cci_boader(position, df, self.cci_column_name, self.close_column_name, self.upper, self.lower)
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
@@ -525,13 +549,13 @@ class RangeTrade(StrategyClient):
         alpha=1,
         slope_ratio=0.4,
         interval_mins: int = -1,
-        amount=1,
+        volume=1,
         data_length: int = 100,
         trailing_stop=None,
         logger=None,
     ) -> None:
         super().__init__(finance_client=finance_client, idc_processes=None, 
-                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         interval_mins=interval_mins, volume=volume, data_length=data_length,
                          trailing_stop=trailing_stop, logger=logger)
         ohlc_columns = finance_client.get_ohlc_columns()
         self.close_column = ohlc_columns["Close"]
@@ -567,11 +591,14 @@ class RangeTrade(StrategyClient):
             self.__tp_threrad,
             self.close_column,
         )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
 class MACDRenkoRange(StrategyClient):
-    key = "macd_ranko_range"
+    key = "macd_renko_range"
 
     @classmethod
     def get_required_idc_param_keys(self):
@@ -607,7 +634,7 @@ class MACDRenkoRange(StrategyClient):
         bolinger_process=None,
         slope_window=5,
         alpha=2,
-        amount=1,
+        volume=1,
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
@@ -615,7 +642,7 @@ class MACDRenkoRange(StrategyClient):
         logger=None,
     ) -> None:
         super().__init__(finance_client=finance_client, idc_processes=None, 
-                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         interval_mins=interval_mins, volume=volume, data_length=data_length,
                          trailing_stop=trailing_stop, logger=logger)
 
         if renko_process.kinds != "Renko":
@@ -677,6 +704,9 @@ class MACDRenkoRange(StrategyClient):
             self.threshold,
             self.close_column_name,
         )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
 
@@ -719,7 +749,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         range_process=None,
         slope_window=5,
         alpha=2,
-        amount=1,
+        volume=1,
         use_tp=False,
         interval_mins: int = -1,
         data_length=250,
@@ -771,7 +801,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             bolinger_process=bolinger_process,
             slope_window=slope_window,
             alpha=alpha,
-            amount=amount,
+            volume=volume,
             interval_mins=interval_mins,
             data_length=data_length,
             threshold=threshold,
@@ -807,8 +837,127 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             rsi_column=self.rsi_column,
             rsi_threshold=self.rsi_threshold,
         )
+        if signal is not None:
+            signal.volume = self.volume
+            signal.symbol = symbol
         return signal
 
+
+class CascadeStrategyClient(StrategyClient):
+    key = "cascade_strategy"
+
+    def __init__(self, strategies: Union[List[StrategyClient], StrategyClient], cascade_frames: Union[List[int], Union[str]],
+                 finance_client, close_condition:str = "any",
+                 interval_mins=-1, volume=1, data_length=100, trailing_stop=None, save_signal_info=False) -> None:
+        """ run strategy based on cascade_frames. If all strategy rise the same open signal, return the signal.
+
+
+        Args:
+            strategies (Union[List[StrategyClient], StrategyClient]): list of strategies to be cascaded or a single strategy
+            cascade_frames (Union[List[int], Union[str]]): list of frames corresponding to the strategies. You can specify frame string like "30min", "1h"
+            close_condition (str): condition to close position when multiple close signals are returned. any, all, first or last. Defaults to "any".
+            interval_mins (int, optional):  interval mins to get data. Defaults to -1.
+            volume (int, optional): volume per trade. Defaults to 1.
+            data_length (int, optional): length of data to be used. Defaults to 100.
+            trailing_stop (_type_, optional): trailing stop value. Defaults to None.
+            save_signal_info (bool, optional): whether to save signal information. Defaults to False.
+        """
+        
+        if not isinstance(strategies, list):
+            strategies = [strategies]
+        self.strategies = strategies
+
+        cascade_frames_int = []
+        for frame in cascade_frames:
+            if isinstance(frame, str):
+                frame_min = utils.to_freq(frame)
+                cascade_frames_int.append(frame_min)
+            else:
+                cascade_frames_int.append(frame)
+        if close_condition not in ["any", "all", "first", "last"]:
+            raise ValueError("close_condition should be 'any', 'all', 'first' or 'last'")
+        self.close_if_any = close_condition == "any"
+        self.close_condition = close_condition
+        # sort frames in descending order
+        # cascade_frames_int.sort(reverse=True)
+        self.cascade_frames = cascade_frames_int
+        super().__init__(finance_client=finance_client, idc_processes=None, interval_mins=interval_mins, data_length=data_length,
+                         volume=volume, trailing_stop=trailing_stop, save_signal_info=save_signal_info)
+    
+    def _reset_auto_index(self, org_auto_index):
+        for strategy, auto_index in zip(self.strategies, org_auto_index):
+            strategy.client.auto_index = auto_index
+
+    def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
+        pre_signal = None
+        last_signal = None
+        start_index = 0
+        org_auto_index = [strategy.client.auto_index for strategy in self.strategies]
+        end_index = len(self.strategies)
+        if self.close_condition == "first":
+            frame = self.cascade_frames[0]
+            strategy = self.strategies[0]
+            strategy.client.auto_index = False
+            temp_df = strategy.client.get_ohlc(symbols=symbol, length=self.data_length, frame=frame, idc_processes=strategy._idc_processes)
+            pre_signal = strategy.get_signal(temp_df, position=position, symbol=symbol)
+            if pre_signal is not None and pre_signal.is_close:
+                if pre_signal.is_buy is None:
+                    self._reset_auto_index(org_auto_index)
+                    return pre_signal
+                else:
+                    for strategy, frame in zip(self.strategies[1:], self.cascade_frames[1:]):
+                        temp_df = strategy.client.get_ohlc(symbols=symbol, length=self.data_length, frame=frame, idc_processes=strategy._idc_processes)
+                        strategy_signal = strategy.get_signal(temp_df, position=position, symbol=symbol)
+                        if strategy_signal is None:
+                            self._reset_auto_index(org_auto_index)
+                            return CloseSignal(pre_signal.std_name, confidence=pre_signal.confidence, symbol=pre_signal.symbol)
+                        elif pre_signal.is_buy is strategy_signal.is_buy:
+                            continue
+                        else:
+                            self._reset_auto_index(org_auto_index)
+                            return CloseSignal(pre_signal.std_name, confidence=pre_signal.confidence, symbol=pre_signal.symbol)
+                    self._reset_auto_index(org_auto_index)
+                    return pre_signal
+            start_index = 1
+        elif self.close_condition == "last":
+            frame = self.cascade_frames[-1]
+            strategy = self.strategies[-1]
+            strategy.client.auto_index = False
+            temp_df = strategy.client.get_ohlc(symbols=symbol, length=self.data_length, frame=frame, idc_processes=strategy._idc_processes)
+            last_signal = strategy.get_signal(temp_df, position=position, symbol=symbol)
+            if last_signal is not None and last_signal.is_close:
+                self._reset_auto_index(org_auto_index)
+                return last_signal
+            end_index -= 1
+        for strategy, frame in zip(self.strategies[start_index:end_index], self.cascade_frames[start_index:end_index]):
+            temp_df = strategy.client.get_ohlc(symbols=symbol, length=self.data_length, frame=frame, idc_processes=strategy._idc_processes)
+            strategy_signal = strategy.get_signal(temp_df, position=position, symbol=symbol)
+            if strategy_signal is None:
+                self._reset_auto_index(org_auto_index)
+                return None
+            elif strategy_signal.is_close and self.close_if_any:
+                self._reset_auto_index(org_auto_index)
+                return strategy_signal
+            elif pre_signal is None:
+                pre_signal = strategy_signal
+            else:
+                if pre_signal.is_buy is strategy_signal.is_buy:
+                    pre_signal = strategy_signal
+                else:
+                    self._reset_auto_index(org_auto_index)
+                    return None
+        if last_signal is not None:
+            if pre_signal.is_buy is last_signal.is_buy:
+                self._reset_auto_index(org_auto_index)
+                return last_signal
+            else:
+                self._reset_auto_index(org_auto_index)
+                return None
+        self._reset_auto_index(org_auto_index)
+        if pre_signal is not None:
+            pre_signal.volume = self.volume
+            pre_signal.symbol = symbol
+        return pre_signal
 
 class Momentum(StrategyClient):
     key = "atrsma"
@@ -826,7 +975,7 @@ class Momentum(StrategyClient):
         risk_factor=0.001,
         idc_processes=...,
         interval_mins: int = -1,
-        amount=1,
+        volume=1,
         data_length: int = 100,
         save_signal_info=False,
         trailing_stop=None,
@@ -841,14 +990,14 @@ class Momentum(StrategyClient):
         self.threshold = threshold
         self.risk_factor = risk_factor
         super().__init__(finance_client=finance_client, idc_processes=idc_processes, 
-                         interval_mins=interval_mins, amount=amount, data_length=data_length,
+                         interval_mins=interval_mins, volume=volume, data_length=data_length,
                          save_signal_info=save_signal_info, trailing_stop=trailing_stop, logger=logger)
 
-    def get_signals(self, df, positions: list[Position] = None, symbols: list[str] = None):
+    def get_signal(self, df, positions: list[Position] = None, symbols: List[str] = None):
         signals = strategy.momentum_ma(
             positions,
             df,
-            self.amount,
+            self.volume,
             self.momentum_column,
             self.short_ma_column,
             self.atr_column,
@@ -858,4 +1007,8 @@ class Momentum(StrategyClient):
             self.threshold,
             self.risk_factor,
         )
+        if signals is not None:
+            for signal in signals:
+                signal.volume = self.volume
+                signal.symbol = symbols
         return signals

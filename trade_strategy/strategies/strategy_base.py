@@ -19,7 +19,7 @@ class StrategyClient:
         finance_client: ClientBase,
         idc_processes=...,
         interval_mins: int = None,
-        amount=1,
+        volume=1,
         data_length: int = 100,
         trailing_stop=None,
         save_signal_info=False,
@@ -49,7 +49,7 @@ class StrategyClient:
             idc_processes = []
         self._idc_processes = idc_processes
         self.save_signal_info = save_signal_info
-        self.amount = amount
+        self.volume = volume
         self.client = finance_client
         self.data_length = data_length
         self.trailing_stop = trailing_stop
@@ -84,7 +84,7 @@ class StrategyClient:
                 self.client.update_position(position=id, sl=stop_price)
         return None
 
-    def run(self, symbols: Union[str, list]) -> Signal:
+    def run(self, symbols: Union[str, list], state=None) -> Signal:
         """run this strategy
 
         Args:
@@ -109,6 +109,7 @@ class StrategyClient:
         else:
             get_dataframe = lambda df, key: df[key]
 
+        
         positions = self.client.get_positions(symbols=symbols)
         self.update_stop(df, positions=positions)
         if len(positions) > 1:
@@ -125,7 +126,7 @@ class StrategyClient:
             if len(symbol_positions) == 0:
                 signal = self.get_signal(ohlc_df, None, symbol)
                 if signal is not None:
-                    signal.amount = self.amount
+                    signal.volume = self.volume
                     signal.symbol = symbol
                     signals.append(signal)
                     if self.save_signal_info:
@@ -134,13 +135,12 @@ class StrategyClient:
                 for position in symbol_positions:
                     signal = self.get_signal(ohlc_df, position, symbol)
                     if signal is not None:
-                        signal.amount = self.amount
+                        signal.volume = self.volume
                         signal.symbol = symbol
                         signals.append(signal)
                         if self.save_signal_info:
                             self.save_signal(signal, ohlc_df)
         return signals
-
 
 class MultiSymbolStrategyClient(StrategyClient):
     def __init__(
@@ -148,12 +148,12 @@ class MultiSymbolStrategyClient(StrategyClient):
         finance_client: ClientBase,
         idc_processes=[],
         interval_mins: int = -1,
-        amount=1,
+        volume=1,
         data_length: int = 100,
         save_signal_info=False,
         logger=None,
     ) -> None:
-        super().__init__(finance_client, idc_processes, interval_mins, amount, data_length, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, volume, data_length, save_signal_info, logger)
 
     def get_signal(self, df, position = None, symbols=None):
         if symbols is None:

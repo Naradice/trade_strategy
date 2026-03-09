@@ -21,7 +21,7 @@ def slope_change(
     ema_threshold=0.1,
     rsi_threshold=70,
     order_price_column="Close",
-    amount=1,
+    volume=1,
     in_range=False,
 ):
     key = "slope_change"
@@ -36,21 +36,21 @@ def slope_change(
     if position is None:
         if last_slope_value > slope_threshold and rsi_threshold > df[rsi_column].iloc[-1]:
             if trend_possibility > ema_threshold:
-                signal = BuySignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                signal = BuySignal(key, volume=volume, price=df[order_price_column].iloc[-1])
                 in_range = False
             elif trend_possibility > -ema_threshold:
-                signal = SellSignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                signal = SellSignal(key, volume=volume, price=df[order_price_column].iloc[-1])
                 in_range = True
         elif last_slope_value < -slope_threshold and rsi_threshold > df[rsi_column].iloc[-1]:
             if trend_possibility < -ema_threshold:
-                signal = SellSignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                signal = SellSignal(key, volume=volume, price=df[order_price_column].iloc[-1])
                 in_range = False
             elif trend_possibility < ema_threshold:
-                signal = BuySignal(key, amount=amount, price=df[order_price_column].iloc[-1])
+                signal = BuySignal(key, volume=volume, price=df[order_price_column].iloc[-1])
                 in_range = True
     else:
         if in_range:
-            if position.position_type.value == -1:
+            if position.position_side.value == -1:
                 if trend_possibility > ema_threshold:
                     print(f"closed by trend {ema_threshold} as range ended")
                     signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
@@ -60,7 +60,7 @@ def slope_change(
                 elif last_slope_value > slope_threshold:
                     print(f"closed by slope {last_slope_value} in range")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
-            elif position.position_type.value == 1:
+            elif position.position_side.value == 1:
                 if trend_possibility < -ema_threshold:
                     print(f"closed by trend {ema_threshold} as range ended")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
@@ -71,7 +71,7 @@ def slope_change(
                     print(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
         else:
-            if position.position_type.value == -1:
+            if position.position_side.value == -1:
                 if rsi_threshold < df[rsi_column].iloc[-1]:
                     print(f"closed by rsi {df[rsi_column].iloc[-1]}")
                     signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
@@ -81,7 +81,7 @@ def slope_change(
                 elif last_slope_value > slope_threshold:
                     print(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
-            elif position.position_type.value == 1:
+            elif position.position_side.value == 1:
                 if rsi_threshold < df[rsi_column].iloc[-1]:
                     print(f"closed by rsi {df[rsi_column].iloc[-1]}")
                     signal = CloseSellSignal(key, price=df[order_price_column].iloc[-1])
@@ -112,7 +112,7 @@ def macd_cross(position, previouse_trend, data, target_column="Close", signal_co
     tick_trend, price = __get_macd_trend(data, target_column, signal_column_name, macd_column_name)
     signal = None
     if tick_trend != 0:
-        long_short = position.position_type.value if position is not None else 0
+        long_short = position.position_side.value if position is not None else 0
         if previouse_trend == 1 and tick_trend == -1:
             previouse_trend = tick_trend
             if long_short == 1:
@@ -140,7 +140,7 @@ def macd_renko(
     range_function=None,
 ):
     key = "macd_renko"
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     signal = None
     is_range = range_function(df) if range_function is not None else False
     if len(df) > 0:
@@ -204,7 +204,7 @@ def macd_renko_with_slope(
     range_function=None,
 ):
     key = "macd_renko_slope"
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     is_range = range_function(df) if range_function is not None else False
     signal = None
     if len(df) > 0:
@@ -318,7 +318,7 @@ def macd_renko_bb(
 
 def cci_cross(position, df: pd.DataFrame, cci_column_name, order_price_column="Close", boarder=0):
     key = "cci_cross"
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     signal = None
     if len(df) > 0:
         pre_tick = df.iloc[-2]
@@ -343,7 +343,7 @@ def cci_cross(position, df: pd.DataFrame, cci_column_name, order_price_column="C
 
 def cci_boader(position, df: pd.DataFrame, cci_column_name, order_price_column, upper_boader=100, lower_boader=-100):
     key = "cci_boader"
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     signal = None
     if len(df) > 0:
         last_df = df.iloc[-1]
@@ -387,7 +387,7 @@ def range_experimental(
     rp = df[range_possibility_column].iloc[-1]
     tp = df[trend_possibility_column].iloc[-1]
     signal = None
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     if rp < 0.6:
         width = df[width_column].iloc[-1]
         std = width / (bb_alpha * 2)
@@ -456,7 +456,7 @@ def macd_renko_range_ex(
 ):
     key = "macd_renko_range_ex"
     __is_in_range = is_in_range
-    long_short = position.position_type.value if position is not None else 0
+    long_short = position.position_side.value if position is not None else 0
     signal = None
 
     if len(df) > 0:
@@ -641,7 +641,7 @@ def momentum_ma(
     for index, symbol_momentum in enumerate(symbol_data):
         # we can check whether are there open positions
         position = positions[index]
-        if position.position_type.value == 1:
+        if position.position_side.value == 1:
             if is_bull_market:
                 symbol = symbol_data.index[index]
                 # if the stock is not in the top 20% then close the long position

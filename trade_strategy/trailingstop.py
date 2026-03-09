@@ -14,9 +14,9 @@ class TrailingStopBase:
         current_price = ohlc_df.iloc[-1]
         target_positions = []
         for position in positions:
-            if position.position_type.value == 1 and current_price[close_column] > position.price:
+            if position.position_side.value == 1 and current_price[close_column] > position.price:
                 target_positions.append(position)
-            elif position.position_type.value == -1 and current_price[close_column] < position.price:
+            elif position.position_side.value == -1 and current_price[close_column] < position.price:
                 target_positions.append(position)
         if len(target_positions) == 0:
             return {}
@@ -58,7 +58,7 @@ class TrailingStopByATR(TrailingStopBase):
         latest_atr = atr_series.iloc[-1]
 
         for position in positions:
-            if position.position_type.value == 1:  # Long position
+            if position.position_side.value == 1:  # Long position
                 new_stop = last_price - (self.atr_multiplier * latest_atr)
                 if self.clip_with_price and new_stop < position.price:
                     new_stop = position.price
