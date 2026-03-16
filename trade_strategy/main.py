@@ -143,7 +143,11 @@ class ParallelStrategyManager:
 
         while datetime.datetime.now() < self.__end_time and self.done is False:
             start_time = datetime.datetime.now()
-            signals = self.runner.get_signals(strategy)
+            try:
+                signals = self.runner.get_signals(strategy)
+            except StopIteration:
+                logger.info("CSV data exhausted, ending strategy")
+                break
             end_time = datetime.datetime.now()
             diff = end_time - start_time
             logger.debug(f"took {diff} for caliculate the signal")

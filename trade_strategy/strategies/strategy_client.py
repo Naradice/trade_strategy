@@ -1,7 +1,6 @@
 import finance_client as fc
 import pandas as pd
-from finance_client.position import Position
-from finance_client import utils
+from finance_client import utils, Position
 from typing import List, List, Union
 
 from trade_strategy.signal import Signal
@@ -181,6 +180,8 @@ class MACDRenko(StrategyClient):
         threshold=2,
         slope_window=None,
         logger=None,
+        renko_brick_size=None,
+        renko_window=None,
         trailing_stop=None,
         range_function=None,
     ) -> None:
@@ -191,7 +192,11 @@ class MACDRenko(StrategyClient):
                 raise Exception("renko_process accept only RenkoProcess")
         else:
             ohlc_dict = finance_client.get_ohlc_columns()
-            renko_process = fc.fprocess.RenkoProcess(ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]))
+            renko_process = fc.fprocess.RenkoProcess(
+                ohlc_column=(ohlc_dict["Open"], ohlc_dict["High"], ohlc_dict["Low"], ohlc_dict["Close"]),
+                brick_size=renko_brick_size,
+                window=renko_window,
+            )
         if macd_process is not None:
             if macd_process.kinds != "MACD":
                 raise Exception("macd_process accept only MACDProcess")
