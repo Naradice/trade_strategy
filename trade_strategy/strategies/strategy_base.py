@@ -95,6 +95,8 @@ class StrategyClient:
         """
         try:
             df = self.client.get_ohlc(symbols=symbols, length=self.data_length, idc_processes=self._idc_processes)
+        except StopIteration:
+            raise
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
             return []
@@ -179,6 +181,8 @@ class MultiSymbolStrategyClient(StrategyClient):
         """
         try:
             df = self.client.get_ohlc(self.data_length, symbols, idc_processes=self._idc_processes)
+        except StopIteration:
+            raise
         except Exception as e:
             self.logger.error(f"error occured when client gets ohlc data: {e}")
             return []
