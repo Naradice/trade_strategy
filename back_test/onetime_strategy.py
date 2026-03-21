@@ -70,6 +70,7 @@ def MACDRenko(slope=5, threshold=2, atr_window=None, brick_size=None, range_func
     signals = runner.get_signals(st1)
     logger.info(f"total signals: {len(signals)}")
     runner.handle_signals(st1, signals)
+    client.close_client()
 
 
 if __name__ == "__main__":
