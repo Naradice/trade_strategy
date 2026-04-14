@@ -42,6 +42,25 @@ ohlc_columns = ["open", "high", "low", "close"]
 
 MINUTES_TO_RUN = 10
 
+
+def _make_storage(sqlite_path: str, provider: str, user: str):
+    """Return a position storage object.  Uses PostgreSQL when PostgreServer env var is set, otherwise SQLite."""
+    pg_host = os.environ.get("PostgreServer")
+    if pg_host:
+        return db.PositionPostgresStorage(
+            provider=provider,
+            username=user,
+            host=pg_host,
+            port=int(os.environ.get("PostgrePort", "5432")),
+            database=os.environ.get("PostgreDatabase", "postgres"),
+            user=os.environ.get("PostgreUsername", "postgres"),
+            password=os.environ.get("PostgrePassword", ""),
+        )
+    if os.path.exists(sqlite_path):
+        os.remove(sqlite_path)
+    return db.PositionSQLiteStorage(sqlite_path, provider, user)
+
+
 def MACDRenko(user, provider="csv", slope=5, threshold=2, atr_window=None, brick_size=None, range_function=None, trailing_stop=None,
               account_risk_config=None, risk_option=None):
     additionals = []
@@ -50,9 +69,7 @@ def MACDRenko(user, provider="csv", slope=5, threshold=2, atr_window=None, brick
     if trailing_stop is not None:
         additionals.append("tstop")
 
-    if os.path.exists("./back_test.db"):
-        os.remove("./back_test.db")
-    storage = db.PositionSQLiteStorage("./back_test.db", provider, user)
+    storage = _make_storage("./back_test.db", provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
@@ -79,7 +96,7 @@ def MACDRenko(user, provider="csv", slope=5, threshold=2, atr_window=None, brick
 
 def MACDRenkoByBBCSV(slope=5, window=20, provider="csv", user="back_test"):
     ldb = db.LogCSVStorage(provider, user, f"./back_test_USDJPY_{frame}.csv")
-    storage = db.PositionSQLiteStorage("./back_test.db", provider, user)
+    storage = _make_storage("./back_test.db", provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
@@ -105,7 +122,7 @@ def MACDRenkoRangeCSV(slope=5):
     provider = "csv"
     user = "back_test"
     ldb = db.LogCSVStorage(provider, user, f"./back_test_USDJPY_{frame}.csv")
-    storage = db.PositionSQLiteStorage("./back_test.db", provider, user)
+    storage = _make_storage("./back_test.db", provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
@@ -129,7 +146,7 @@ def MACDRenkoRangeSLCSV(slope_window=5, use_tp=True):
     provider = "csv"
     user = "back_test"
     ldb = db.LogCSVStorage(provider, user, f"./back_test_USDJPY_{frame}.csv")
-    storage = db.PositionSQLiteStorage("./back_test.db", provider, user)
+    storage = _make_storage("./back_test.db", provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,

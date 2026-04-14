@@ -87,6 +87,24 @@ ohlc_columns = ["open", "high", "low", "close"]
 # ---------------------------------------------------------------------------
 import trade_strategy as ts
 from finance_client import db
+
+
+def _make_storage(sqlite_path: str, provider: str, user: str):
+    """Return a position storage object.  Uses PostgreSQL when PostgreServer env var is set, otherwise SQLite."""
+    pg_host = os.environ.get("PostgreServer")
+    if pg_host:
+        return db.PositionPostgresStorage(
+            provider=provider,
+            username=user,
+            host=pg_host,
+            port=int(os.environ.get("PostgrePort", "5432")),
+            database=os.environ.get("PostgreDatabase", "postgres"),
+            user=os.environ.get("PostgreUsername", "postgres"),
+            password=os.environ.get("PostgrePassword", ""),
+        )
+    if os.path.exists(sqlite_path):
+        os.remove(sqlite_path)
+    return db.PositionSQLiteStorage(sqlite_path, provider, user)
 from finance_client.csv.client import CSVClient
 from finance_client.fprocess.fprocess.idcprocess import MACDProcess, RSIProcess
 
@@ -160,10 +178,7 @@ def build_strategy(macd_process: MACDProcess, rsi_process: RSIProcess):
 
 def run(user="unit_strategy_sample", provider="csv", minutes_to_run=10):
     db_path = "./unit_strategy_back_test.db"
-    if os.path.exists(db_path):
-        os.remove(db_path)
-
-    storage = db.PositionSQLiteStorage(db_path, provider, user)
+    storage = _make_storage(db_path, provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
@@ -211,10 +226,7 @@ def run_onetime(user="unit_strategy_onetime", provider="csv"):
     Useful for quick result inspection without waiting for a real-time timer.
     """
     db_path = "./unit_strategy_onetime.db"
-    if os.path.exists(db_path):
-        os.remove(db_path)
-
-    storage = db.PositionSQLiteStorage(db_path, provider, user)
+    storage = _make_storage(db_path, provider, user)
     client = CSVClient(
         files=file_path,
         auto_step_index=True,
