@@ -30,7 +30,7 @@ class StrategyClient:
                 with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "../settings.json")), "r") as f:
                     settings = json.load(f)
             except Exception as e:
-                self.logger.error(f"fail to load settings file on strategy: {e}")
+                print(f"fail to load settings file on strategy: {e}")
                 raise e
 
             logger_config = settings["log"]
@@ -46,7 +46,7 @@ class StrategyClient:
         else:
             self.logger = logger
 
-        if hasattr(idc_processes, "len"):
+        if isinstance(idc_processes, list):
             self._idc_processes = idc_processes
         else:
             self._idc_processes = []

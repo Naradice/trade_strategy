@@ -250,7 +250,7 @@ def order_by_signal_file(file_path: str, finance_client: fc.ClientBase, mode="ra
     if os.path.exists(file_path):
         with open(file_path) as fp:
             signals = json.load(fp)
-        order_by_signals(signals)
+        order_by_signals(signals, finance_client, mode)
     else:
         print("file path doesn't exist")
 

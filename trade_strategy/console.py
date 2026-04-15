@@ -41,14 +41,18 @@ def initialize_logger(logger=None, log_level=INFO, name="trade_strategy.main"):
 
 
 class Command:
-    disable = "disable"
-    disable_long = "disable long"
-    disable_short = "disable short"
-    enable = "enable"
-    enable_long = "enable long"
-    enable_short = "enable short"
-    update = "update"
-    end = "exit"
+    disable = "/disable"
+    disable_long = "/disable long"
+    disable_short = "/disable short"
+    enable = "/enable"
+    enable_long = "/enable long"
+    enable_short = "/enable short"
+    update = "/update"
+    end = "/exit"
+
+    @classmethod
+    def all_commands(cls):
+        return [cls.disable, cls.disable_long, cls.disable_short, cls.enable, cls.enable_long, cls.enable_short, cls.update, cls.end]
 
 
 class CursesHandler(Handler):
@@ -66,15 +70,18 @@ class CursesHandler(Handler):
         if len(self.log_lines) > self.max_lines:
             self.log_lines.pop(0)
 
+        current_input = self.input_box.get_current_input()
         self.stdscr.clear()
-        for idx, line in enumerate(self.log_lines):
-            self.stdscr.addstr(idx, 0, line)
+        if current_input.startswith("/"):
+            matching = [cmd for cmd in Command.all_commands() if cmd.startswith(current_input)]
+            self.stdscr.addstr(0, 0, "Available commands:")
+            for idx, cmd in enumerate(matching):
+                self.stdscr.addstr(idx + 1, 0, cmd)
+        else:
+            for idx, line in enumerate(self.log_lines):
+                self.stdscr.addstr(idx, 0, line)
         self.stdscr.addstr(curses.LINES - 3, 0, "-" * curses.COLS)
-        self.stdscr.addstr(
-            curses.LINES - 1,
-            0,
-            f"Command: {self.input_box.get_current_input()}",
-        )
+        self.stdscr.addstr(curses.LINES - 1, 0, f"Command: {current_input}")
         self.stdscr.refresh()
 
 
@@ -167,6 +174,7 @@ class Console:
                     break
                 else:
                     input_box.add_char(ch)
+                    curses_handler.emit(None)
 
     def input(self, pipe):
         self.done = False
