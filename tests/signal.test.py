@@ -14,18 +14,18 @@ class SignalTest(unittest.TestCase):
         signal = update_signal_with_close(buy_signal)
         self.assertTrue(isinstance(signal, CloseBuySignal))
         self.assertTrue(signal.is_close and signal.is_buy)
-    
+
     def test_update_sellsignal_with_close(self):
         _signal = SellSignal("unit_test", volume=1, price=1, symbol="TEST")
         signal = update_signal_with_close(_signal)
         self.assertTrue(isinstance(signal, CloseSellSignal))
         self.assertTrue(signal.is_close and signal.is_buy == False)
-        
+
     def test_keep_closesignal_by_update(self):
         _signal = CloseSignal("unit_test", symbol="TEST")
         signal = update_signal_with_close(_signal)
         self.assertTrue(isinstance(signal, CloseSignal))
         self.assertTrue(signal.is_close and signal.is_buy is None)
-    
+
 if __name__ == '__main__':
     unittest.main()

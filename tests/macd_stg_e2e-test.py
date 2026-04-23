@@ -25,60 +25,6 @@ fx_file_path = os.path.join(data_folder, "..\\fx\\OANDA-Japan MT5 Live\\mt5_USDJ
 
 
 class Test(unittest.TestCase):
-    # def test_MACDWidthCSV(self):
-    #     client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
-    #     st1 = ts.strategies.MACDCross(client, interval_mins=0)
-    #     manager = ts.ParallelStrategyManager([st1], seconds=10)
-    #     manager.start_strategies()
-
-    # def test_MACDWithCSVWithTrailingStop(self):
-    #     client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
-    #     trailing_stop = ts.trailingstop.TrailingStopByATR(
-    #         ohlc_columns=["open", "high", "low", "close"],
-    #         atr_window=14,
-    #         atr_multiplier=3.0,
-    #         clip_with_price=True
-    #     )
-    #     st1 = ts.strategies.MACDCross(client, interval_mins=0, trailing_stop=trailing_stop)
-    #     manager = ts.ParallelStrategyManager([st1], seconds=10)
-    #     manager.start_strategies()
-    
-    # def test_MACDWithCSVWithRangeFunction(self):
-    #     client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
-    #     def range_function(df):
-    #         return df["high"] - df["low"]
-    #     st1 = ts.strategies.MACDCross(client, interval_mins=0, range_function=range_function)
-    #     manager = ts.ParallelStrategyManager([st1], seconds=10)
-    #     manager.start_strategies()
-    
-    # def test_MACDWithCSVWithRangeFunctionAndTrailingStop(self):
-    #     client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
-    #     def range_function(df):
-    #         return df["high"] - df["low"]
-    #     trailing_stop = ts.trailingstop.TrailingStopByATR(
-    #         ohlc_columns=["open", "high", "low", "close"],
-    #         atr_window=14,
-    #         atr_multiplier=3.0,
-    #         clip_with_price=True
-    #     )
-    #     st1 = ts.strategies.MACDCross(client, interval_mins=0, range_function=range_function, trailing_stop=trailing_stop)
-    #     manager = ts.ParallelStrategyManager([st1], seconds=10)
-    #     manager.start_strategies()
-    
-    # def test_MACDWithCSVWithRangeFunctionAndTrailingStopWithoutClipping(self):
-    #     client = CSVClient(files=file_path, auto_step_index=True, start_index=300)
-    #     def range_function(df):
-    #         return df["high"] - df["low"]
-    #     trailing_stop = ts.trailingstop.TrailingStopByATR(
-    #         ohlc_columns=["open", "high", "low", "close"],
-    #         atr_window=14,
-    #         atr_multiplier=3.0,
-    #         clip_with_price=False
-    #     )
-    #     st1 = ts.strategies.MACDCross(client, interval_mins=0, range_function=range_function, trailing_stop=trailing_stop)
-    #     manager = ts.ParallelStrategyManager([st1], seconds=10)
-    #     manager.start_strategies()
-    
     def test_MACDWithCSVWithATRRiskOption(self):
         if os.path.exists("./finance_client.db"):
             os.remove("./finance_client.db")

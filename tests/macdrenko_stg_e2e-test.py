@@ -22,6 +22,10 @@ except Exception as e:
     print(f"fail to load settings file: {e}")
     raise e
 dotenv.load_dotenv(".env")
+logger_config = settings["log"]
+log_file_base_name = logger_config["handlers"]["fileHandler"]["filename"]
+config.dictConfig(logger_config)
+logger = getLogger("trade_strategy.test")
 
 data_folder = os.environ["ts_data_folder"]
 base_path = os.path.dirname(__file__)

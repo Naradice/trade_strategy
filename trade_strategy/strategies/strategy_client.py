@@ -230,7 +230,6 @@ class MACDRenko(StrategyClient):
         self.range_function = range_function
 
     def get_signal(self, df: pd.DataFrame, position: Position = None, symbol: str = None):
-        
         if self.slope_signal_column is not None:
             signal = strategy.macd_renko_with_slope(
                 position,

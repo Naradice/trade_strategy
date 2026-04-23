@@ -76,7 +76,7 @@ class StrategyClient:
         self.market_trends[symbol] = market_trend
 
     def get_signal(self, df, position: Position = None, symbols=...) -> Signal:
-        print("please overwrite this method on an actual client.")
+        self.logger.debug("please overwrite this method on an actual client.")
         return None
     
     def update_stop(self, df, positions) -> Signal:

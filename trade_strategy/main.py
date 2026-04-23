@@ -455,7 +455,7 @@ class ParallelStrategyManager(StrategyManager):
         for strategy in strategies:
             if strategy.client.do_render:
                 if warned is False:
-                    self.logger.warn("disable to render mode since Parallel strategy doesn't support it")
+                    self.logger.warning("disable to render mode since Parallel strategy doesn't support it")
                     warned = True
                 strategy.client.do_render = False
             strategy.logger = self.logger
