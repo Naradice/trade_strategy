@@ -1,11 +1,18 @@
-import curses
 import json
 import os
 import threading
 from logging import getLogger, config, Handler, INFO
 
-ENTER_KEY = curses.KEY_ENTER
-END_KEY = curses.KEY_END
+try:
+    import curses
+    _CURSES_AVAILABLE = True
+    ENTER_KEY = curses.KEY_ENTER
+    END_KEY = curses.KEY_END
+except ImportError:
+    curses = None
+    _CURSES_AVAILABLE = False
+    ENTER_KEY = 13  # Windows Enter
+    END_KEY = 3     # Ctrl+C
 
 def initialize_logger(logger=None, log_level=INFO, name="trade_strategy.main"):
     if os.name == 'posix':
@@ -130,6 +137,8 @@ class Console:
         self.thread = None
 
     def _start(self, pipe):
+        if not _CURSES_AVAILABLE:
+            raise RuntimeError("console_mode requires the 'windows-curses' package on Windows: pip install windows-curses")
         curses.wrapper(self._wait_input, pipe=pipe)
 
     def _wait_input(self, stdscr, pipe):

@@ -426,7 +426,7 @@ class ParallelStrategyManager(StrategyManager):
         resultTxt = f"Revenute:{totalRevenue}, signal count: {totalSignalCount}, win Rate: {totalWinCount}, plus: {totalWinRevenute}, minus: {totalRevenue - totalWinRevenute}"
         print(resultTxt)
 
-    def _on_timer_pipe(self, strategies, command_child_pipe: multiprocessing.connection.Connection, timer_pipe: multiprocessing.connection.Connection):
+    def _on_timer_pipe(self, strategies, command_child_pipe, timer_pipe):
         while self.stop_event.is_set() is False:
             strategy_index = timer_pipe.recv()
             if strategy_index >= 0:
