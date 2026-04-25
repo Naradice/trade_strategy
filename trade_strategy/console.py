@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import threading
+import textwrap
 from logging import getLogger, config, Handler, INFO
 
 try:
@@ -63,33 +65,73 @@ class Command:
 
 
 class CursesHandler(Handler):
+    INPUT_AREA_HEIGHT = 3
+
     def __init__(self, stdscr, input_box):
         super().__init__()
         self.stdscr = stdscr
         self.input_box = input_box
         self.log_lines = []
-        self.max_lines = curses.LINES - 4
+        self.max_lines = max(curses.LINES - (self.INPUT_AREA_HEIGHT + 2), 1)
 
-    def emit(self, record):
-        if record is not None:
-            log_entry = self.format(record)
-            self.log_lines.append(log_entry)
+    def _update_layout(self):
+        self.max_lines = max(curses.LINES - (self.INPUT_AREA_HEIGHT + 2), 1)
+        self.log_separator_row = self.max_lines
+        self.prompt_row = self.log_separator_row + 1
+        self.input_rows = [self.prompt_row + offset for offset in range(1, self.INPUT_AREA_HEIGHT)]
+        self.bottom_separator_row = self.prompt_row + self.INPUT_AREA_HEIGHT
+
+    def _draw_line(self, row, text, column=0):
+        if row < 0 or row >= curses.LINES or column >= curses.COLS:
+            return
+        available_width = max(curses.COLS - column - 1, 0)
+        self.stdscr.addstr(row, column, str(text)[:available_width])
+
+    def _get_command_lines(self, current_input):
+        if current_input.startswith("/"):
+            matching = [cmd for cmd in Command.all_commands() if cmd.startswith(current_input)]
+            if not matching:
+                return [f"No matching commands for: {current_input}"]
+            available_width = max(curses.COLS - 1, 20)
+            wrapped_lines = textwrap.wrap(
+                "Matches: " + ", ".join(matching),
+                width=available_width,
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+            return wrapped_lines[: self.INPUT_AREA_HEIGHT - 1]
+        return ["Type / to list commands"]
+
+    def render(self):
+        self._update_layout()
         if len(self.log_lines) > self.max_lines:
-            self.log_lines.pop(0)
+            self.log_lines = self.log_lines[-self.max_lines :]
 
         current_input = self.input_box.get_current_input()
         self.stdscr.clear()
-        if current_input.startswith("/"):
-            matching = [cmd for cmd in Command.all_commands() if cmd.startswith(current_input)]
-            self.stdscr.addstr(0, 0, "Available commands:")
-            for idx, cmd in enumerate(matching):
-                self.stdscr.addstr(idx + 1, 0, cmd)
-        else:
-            for idx, line in enumerate(self.log_lines):
-                self.stdscr.addstr(idx, 0, line)
-        self.stdscr.addstr(curses.LINES - 3, 0, "-" * curses.COLS)
-        self.stdscr.addstr(curses.LINES - 1, 0, f"Command: {current_input}")
+
+        visible_logs = self.log_lines[-self.max_lines :]
+        for idx, line in enumerate(visible_logs):
+            self._draw_line(idx, line)
+
+        separator = "-" * max(curses.COLS - 1, 1)
+        self._draw_line(self.log_separator_row, separator)
+        self._draw_line(self.prompt_row, f"Command: {current_input}")
+
+        command_lines = self._get_command_lines(current_input)
+        for row, text in zip(self.input_rows, command_lines):
+            self._draw_line(row, text)
+
+        self._draw_line(self.bottom_separator_row, separator)
+        self.stdscr.move(self.prompt_row, min(len("Command: ") + len(current_input), max(curses.COLS - 1, 0)))
         self.stdscr.refresh()
+
+    def emit(self, record):
+        self._update_layout()
+        if record is not None:
+            log_entry = self.format(record)
+            self.log_lines.append(log_entry)
+        self.render()
 
 
 class InputBox:
@@ -135,6 +177,59 @@ class Console:
         self.logger.setLevel(self.log_level)
         self.done = False
         self.thread = None
+        self._curses_handler = None
+        self._attached_loggers = []
+
+    def _get_target_loggers(self):
+        targets = []
+        seen_names = set()
+
+        def add_target(target_logger):
+            if target_logger is None or target_logger.name in seen_names:
+                return
+            seen_names.add(target_logger.name)
+            targets.append(target_logger)
+
+        add_target(self.logger)
+        add_target(getLogger("trade_strategy"))
+
+        for name, logger_obj in logging.Logger.manager.loggerDict.items():
+            if (
+                isinstance(logger_obj, logging.Logger)
+                and name.startswith("trade_strategy.")
+                and (logger_obj.handlers or logger_obj.propagate is False)
+            ):
+                add_target(logger_obj)
+
+        return targets
+
+    def _attach_handler(self, handler: Handler):
+        formatter = None
+        for target_logger in self._get_target_loggers():
+            for existing_handler in target_logger.handlers:
+                if existing_handler.formatter is not None:
+                    formatter = existing_handler.formatter
+                    break
+            if formatter is not None:
+                break
+
+        if formatter is not None:
+            handler.setFormatter(formatter)
+
+        self._attached_loggers = []
+        for target_logger in self._get_target_loggers():
+            if handler not in target_logger.handlers:
+                target_logger.addHandler(handler)
+                self._attached_loggers.append(target_logger)
+
+    def _detach_handler(self):
+        if self._curses_handler is None:
+            return
+
+        for target_logger in self._attached_loggers:
+            if self._curses_handler in target_logger.handlers:
+                target_logger.removeHandler(self._curses_handler)
+        self._attached_loggers = []
 
     def _start(self, pipe):
         if not _CURSES_AVAILABLE:
@@ -144,46 +239,54 @@ class Console:
     def _wait_input(self, stdscr, pipe):
         # https://github.com/zephyrproject-rtos/windows-curses/issues/8
         curses.raw()
+        if hasattr(curses, "curs_set"):
+            curses.curs_set(1)
         input_box = InputBox()
         curses_handler = CursesHandler(stdscr, input_box)
         curses_handler.setLevel(self.log_level)
-        self.logger.addHandler(curses_handler)
+        self._curses_handler = curses_handler
+        self._attach_handler(curses_handler)
+        try:
+            curses_handler.render()
 
-        user_input = None
-        stdscr.timeout(5000)
+            user_input = None
+            stdscr.timeout(5000)
 
-        while self.done is False:
-            ch = stdscr.getch(
-                curses.LINES - 1,
-                len("Command: ") + len(input_box.get_current_input()),
-            )
-            if ch != -1:
-                stdscr.timeout(-1)
-                # enter
-                if ch == 13:
-                    user_input = input_box.get_current_input()
-                    try:
-                        pipe.send(user_input)
-                    except BrokenPipeError:
-                        self.close()
-                        break
-                    stdscr.refresh()
-                    input_box.reset()
-                    if user_input == Command.end:
+            while self.done is False:
+                ch = stdscr.getch(
+                    curses_handler.prompt_row,
+                    len("Command: ") + len(input_box.get_current_input()),
+                )
+                if ch != -1:
+                    stdscr.timeout(-1)
+                    # enter
+                    if ch == 13:
+                        user_input = input_box.get_current_input()
+                        try:
+                            pipe.send(user_input)
+                        except BrokenPipeError:
+                            self.close()
+                            break
+                        stdscr.refresh()
+                        input_box.reset()
+                        curses_handler.emit(None)
+                        if user_input == Command.end:
+                            self.close()
+                            break
+                        else:
+                            stdscr.timeout(5000)
+                    # Ctrl+c
+                    elif ch == 3:
+                        self.logger.error("Keyboard Interupt on console thread")
+                        pipe.send(Command.end)
                         self.close()
                         break
                     else:
-                        stdscr.timeout(5000)
-                # Ctrl+c
-                elif ch == 3:
-                    self.logger.error("Keyboard Interupt on console thread")
-                    self.logger.removeHandler(curses_handler)
-                    pipe.send(Command.end)
-                    self.close()
-                    break
-                else:
-                    input_box.add_char(ch)
-                    curses_handler.emit(None)
+                        input_box.add_char(ch)
+                        curses_handler.emit(None)
+        finally:
+            self._detach_handler()
+            self._curses_handler = None
 
     def input(self, pipe):
         self.done = False
@@ -198,6 +301,9 @@ class Console:
 
     def error(self, msg):
         self.logger.error(msg)
+
+    def warning(self, msg):
+        self.logger.warning(msg)
 
     def warn(self, msg):
         self.logger.warning(msg)

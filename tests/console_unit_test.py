@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import sys
 import unittest
@@ -27,6 +28,7 @@ _spec.loader.exec_module(_console_mod)
 Command = _console_mod.Command
 InputBox = _console_mod.InputBox
 CursesHandler = _console_mod.CursesHandler
+Console = _console_mod.Console
 
 
 class TestCommand(unittest.TestCase):
@@ -118,18 +120,18 @@ class TestCursesHandler(unittest.TestCase):
         handler.emit(None)
 
         texts = self._get_addstr_texts(stdscr)
-        self.assertIn("Available commands:", texts)
+        self.assertTrue(any(text.startswith("Matches:") for text in texts))
 
-    def test_command_mode_shows_all_commands_on_slash(self):
+    def test_command_mode_shows_commands_in_input_area(self):
         box = InputBox()
         box.add_char(ord("/"))
         handler, stdscr = self._make_handler(box)
 
         handler.emit(None)
 
-        texts = self._get_addstr_texts(stdscr)
+        rendered = " ".join(self._get_addstr_texts(stdscr))
         for cmd in Command.all_commands():
-            self.assertIn(cmd, texts)
+            self.assertIn(cmd, rendered)
 
     def test_command_mode_filters_by_prefix(self):
         box = InputBox()
@@ -139,23 +141,23 @@ class TestCursesHandler(unittest.TestCase):
 
         handler.emit(None)
 
-        texts = self._get_addstr_texts(stdscr)
-        self.assertIn(Command.disable, texts)
-        self.assertIn(Command.disable_long, texts)
-        self.assertIn(Command.disable_short, texts)
-        self.assertNotIn(Command.enable, texts)
-        self.assertNotIn(Command.enable_long, texts)
+        rendered = " ".join(self._get_addstr_texts(stdscr))
+        self.assertIn(Command.disable, rendered)
+        self.assertIn(Command.disable_long, rendered)
+        self.assertIn(Command.disable_short, rendered)
+        self.assertNotIn(Command.enable, rendered)
+        self.assertNotIn(Command.enable_long, rendered)
 
-    def test_command_mode_hides_log_lines(self):
+    def test_command_mode_keeps_log_lines_visible(self):
         box = InputBox()
         box.add_char(ord("/"))
         handler, stdscr = self._make_handler(box)
-        handler.log_lines = ["should not appear"]
+        handler.log_lines = ["should still appear"]
 
         handler.emit(None)
 
         texts = self._get_addstr_texts(stdscr)
-        self.assertNotIn("should not appear", texts)
+        self.assertIn("should still appear", texts)
 
     def test_prompt_shows_current_input(self):
         box = InputBox()
@@ -168,6 +170,16 @@ class TestCursesHandler(unittest.TestCase):
         texts = self._get_addstr_texts(stdscr)
         self.assertIn("Command: /exit", texts)
 
+    def test_layout_draws_two_separators(self):
+        box = InputBox()
+        handler, stdscr = self._make_handler(box)
+
+        handler.emit(None)
+
+        separator = "-" * (_mock_curses.COLS - 1)
+        texts = self._get_addstr_texts(stdscr)
+        self.assertEqual(texts.count(separator), 2)
+
     def test_backspace_past_slash_restores_log_mode(self):
         box = InputBox()
         box.add_char(ord("/"))
@@ -179,7 +191,7 @@ class TestCursesHandler(unittest.TestCase):
 
         texts = self._get_addstr_texts(stdscr)
         self.assertIn("a log line", texts)
-        self.assertNotIn("Available commands:", texts)
+        self.assertIn("Type / to list commands", texts)
 
     def test_log_lines_accumulate_on_emit(self):
         box = InputBox()
@@ -192,6 +204,30 @@ class TestCursesHandler(unittest.TestCase):
 
         self.assertEqual(len(handler.log_lines), 1)
         self.assertEqual(handler.log_lines[0], "formatted: msg")
+
+
+class TestConsoleLoggerAttachment(unittest.TestCase):
+    def test_attach_handler_includes_trade_strategy_descendants(self):
+        base_logger = logging.getLogger("trade_strategy")
+        descendant_logger = logging.getLogger("trade_strategy.console_attach.descendant")
+        other_logger = logging.getLogger("external.console_attach")
+        descendant_handler = logging.NullHandler()
+        handler = logging.NullHandler()
+        console = Console(logger=base_logger)
+        descendant_logger.addHandler(descendant_handler)
+
+        console._attach_handler(handler)
+        try:
+            self.assertIn(handler, base_logger.handlers)
+            self.assertIn(handler, descendant_logger.handlers)
+            self.assertNotIn(handler, other_logger.handlers)
+        finally:
+            console._curses_handler = handler
+            console._detach_handler()
+            descendant_logger.removeHandler(descendant_handler)
+
+        self.assertNotIn(handler, base_logger.handlers)
+        self.assertNotIn(handler, descendant_logger.handlers)
 
 
 if __name__ == "__main__":

@@ -224,19 +224,34 @@ class StrategyManager:
         self.enable_short = True
 
     def _summary(self, results: dict):
+        print("=" * 40)
+        print("Backtest Summary")
+        print("=" * 40)
+        any_trades = False
         for symbol, values in results.items():
             totalSignalCount = len(values)
             if totalSignalCount > 0:
+                any_trades = True
                 revenue = sum(values)
                 winList = list(filter(lambda x: x >= 0, values))
                 winCount = len(winList)
-                winRevenute = sum(winList)
-                self.logger.info(
-                    f"{symbol}, Revenute:{revenue}, signal count: {totalSignalCount}, win Rate: {winCount/totalSignalCount}, plus: {winRevenute}, minus: {revenue - winRevenute}, revenue ratio: {winRevenute/revenue}"
+                winRevenue = sum(winList)
+                win_rate = winCount / totalSignalCount
+                revenue_ratio = winRevenue / revenue if revenue != 0 else 0.0
+                summary_line = (
+                    f"{symbol}: trades={totalSignalCount}, revenue={revenue:.4f}, "
+                    f"win_rate={win_rate:.1%}, profit={winRevenue:.4f}, loss={revenue - winRevenue:.4f}, "
+                    f"revenue_ratio={revenue_ratio:.4f}"
                 )
+                print(summary_line)
+                self.logger.info(summary_line)
                 var = statistics.pvariance(values)
                 mean = statistics.mean(values)
-                self.logger.info(f"strategy assesment: revenue mean: {mean}, var: {var}")
+                stats_line = f"{symbol}: mean={mean:.4f}, variance={var:.4f}"
+                print(stats_line)
+                self.logger.info(stats_line)
+        if not any_trades:
+            print("No closed trades recorded.")
 
     def _handle_signal(self, strategy, signal):
         if signal and signal.order_type is not None:
@@ -320,7 +335,6 @@ class StrategyManager:
                 except Exception as e:
                     logger.error(f"error occured when getting portfolio or budget: {e}")
             count += 1
-        self._summary(results)
 
     def start(self, strategy: StrategyClient, wait=False):
         self.runner = StrategyRunner(strategy.client.symbols)
@@ -347,27 +361,29 @@ class StrategyManager:
             s_t = threading.Thread(target=self._on_timer_event, args=(strategy, parent_pipe, timer_event), daemon=True)
             s_t.start()
 
-            def signal_handler(_sig, _frame):
-                try:
-                    child_pipe.send(Command.end)
-                except Exception:
-                    pass
-                self.stop_event.set()
-                self.logger.debug("strategy thread is closed")
-                self.logger.close()
-                self.logger.debug("console thread is closed")
-                self.timer.stop()
-                self.logger.debug("timer thread is closed")
-
-            signal.signal(signal.SIGINT, signal_handler)
             if wait:
-                s_t.join()
+                try:
+                    while s_t.is_alive():
+                        s_t.join(timeout=1.0)
+                except KeyboardInterrupt:
+                    self.stop_event.set()
+                    timer_event.set()
+                    self.timer.stop()
+                    while s_t.is_alive():
+                        s_t.join(timeout=1.0)
+                finally:
+                    if hasattr(self.logger, "close"):
+                        self.logger.close()
+                    self._summary(self.runner.results)
 
     def _on_timer_event(self, strategy, pipe, timer_event: threading.Event):
         while self.stop_event.is_set() is False:
             if timer_event.wait(60):
                 self._start_strategy(strategy, pipe)
                 timer_event.clear()
+            elif pipe.poll():
+                cmd = pipe.recv()
+                self._handle_command(cmd)
 
     def _handle_command(self, msg):
         self.logger.debug(f"received: {msg}")
@@ -400,8 +416,6 @@ class StrategyManager:
 
     def end(self):
         self.stop_event.set()
-        if hasattr(self.logger, "close"):
-            self.logger.close()
         self.timer.stop()
 
 
