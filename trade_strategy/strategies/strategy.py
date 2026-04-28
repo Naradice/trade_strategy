@@ -1,8 +1,12 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from finance_client.position import Position
 
 from ..signal import *
+
+logger = logging.getLogger("trade_strategy.strategies")
 
 
 # Experimental
@@ -52,44 +56,44 @@ def slope_change(
         if in_range:
             if position.position_side.value == -1:
                 if trend_possibility > ema_threshold:
-                    print(f"closed by trend {ema_threshold} as range ended")
+                    logger.debug(f"closed by trend {ema_threshold} as range ended")
                     signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
                 elif rsi_threshold < df[rsi_column].iloc[-1]:
-                    print(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
+                    logger.debug(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
                     signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
                 elif last_slope_value > slope_threshold:
-                    print(f"closed by slope {last_slope_value} in range")
+                    logger.debug(f"closed by slope {last_slope_value} in range")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
             elif position.position_side.value == 1:
                 if trend_possibility < -ema_threshold:
-                    print(f"closed by trend {ema_threshold} as range ended")
+                    logger.debug(f"closed by trend {ema_threshold} as range ended")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
                 elif rsi_threshold < df[rsi_column].iloc[-1]:
-                    print(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
+                    logger.debug(f"closed by rsi {df[rsi_column].iloc[-1]} in range")
                     signal = CloseSellSignal(key, price=df[order_price_column].iloc[-1])
                 elif last_slope_value < -slope_threshold:
-                    print(f"closed by slope {last_slope_value}")
+                    logger.debug(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
         else:
             if position.position_side.value == -1:
                 if rsi_threshold < df[rsi_column].iloc[-1]:
-                    print(f"closed by rsi {df[rsi_column].iloc[-1]}")
+                    logger.debug(f"closed by rsi {df[rsi_column].iloc[-1]}")
                     signal = CloseBuySignal(key, price=df[order_price_column].iloc[-1])
                 elif trend_possibility > ema_threshold / 2:
-                    print(f"closed by trend {ema_threshold}")
+                    logger.debug(f"closed by trend {ema_threshold}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
                 elif last_slope_value > slope_threshold:
-                    print(f"closed by slope {last_slope_value}")
+                    logger.debug(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
             elif position.position_side.value == 1:
                 if rsi_threshold < df[rsi_column].iloc[-1]:
-                    print(f"closed by rsi {df[rsi_column].iloc[-1]}")
+                    logger.debug(f"closed by rsi {df[rsi_column].iloc[-1]}")
                     signal = CloseSellSignal(key, price=df[order_price_column].iloc[-1])
                 elif trend_possibility < -ema_threshold / 2:
-                    print(f"closed by trend {ema_threshold}")
+                    logger.debug(f"closed by trend {ema_threshold}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
                 elif last_slope_value < -slope_threshold:
-                    print(f"closed by slope {last_slope_value}")
+                    logger.debug(f"closed by slope {last_slope_value}")
                     signal = CloseSignal(key, price=df[order_price_column].iloc[-1])
 
     return signal, in_range
@@ -152,8 +156,8 @@ def macd_renko(
                 and last_df[macd_column_column] > last_df[macd_signal_column]
                 and not is_range
             ):
-                print(f"Buy signal is rose: renko_cons_num={renko_cons_num}, macd={last_df[macd_column_column]}, signal={last_df[macd_signal_column]}")
-                print(f"{last_df[macd_column_column] - last_df[macd_signal_column]}")
+                logger.debug(f"Buy signal is rose: renko_cons_num={renko_cons_num}, macd={last_df[macd_column_column]}, signal={last_df[macd_signal_column]}")
+                logger.debug(f"{last_df[macd_column_column] - last_df[macd_signal_column]}")
                 signal = BuySignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif (
                 renko_cons_num <= -threshold
@@ -188,7 +192,7 @@ def macd_renko(
             # elif last_df[macd_column_column] > last_df[macd_signal_column]:
             #     signal = CloseSignal(std_name=key)
     else:
-        print("no data is provided")
+        logger.debug("no data is provided")
     return signal
 
 def macd_renko_with_slope(
@@ -252,7 +256,7 @@ def macd_renko_with_slope(
             # elif renko_cons_num >= threshold:
             #     signal = CloseSignal(std_name=key)
     else:
-        print("no data is provided")
+        logger.debug("no data is provided")
     return signal
 
 
@@ -284,33 +288,33 @@ def macd_renko_bb(
             current_rate = ask_value
             mean_value = df.iloc[-1][mean_value_column]
             if current_rate > mean_value:
-                print(f"added sl by mean_value: {mean_value}")
+                logger.debug(f"added sl by mean_value: {mean_value}")
                 signal.sl = mean_value
             elif current_rate > lower_value:
-                print(f"added sl by lower_value: {lower_value}")
+                logger.debug(f"added sl by lower_value: {lower_value}")
                 signal.sl = lower_value
             else:
-                print("don't add the sl as current value is too low")
+                logger.debug("don't add the sl as current value is too low")
 
         elif signal.is_buy is False:  # sell case
-            print("sell signal is rose. Start adding a sl")
+            logger.debug("sell signal is rose. Start adding a sl")
             current_rate = bid_value
             mean_value = df.iloc[-1][mean_value_column]
             upper_value = df.iloc[-1][upper_value_column]
             if current_rate < mean_value:
-                print(f"added sl by mean_value: {mean_value}")
+                logger.debug(f"added sl by mean_value: {mean_value}")
                 signal.sl = mean_value
             elif current_rate < upper_value:
-                print(f"added sl by upper_value: {upper_value}")
+                logger.debug(f"added sl by upper_value: {upper_value}")
                 signal.sl = upper_value
             else:
-                print("don't add sl as current value is too high")
+                logger.debug("don't add sl as current value is too high")
 
         elif signal.is_close:
             pass
 
         else:
-            print(f"unkown signal type {signal.is_buy}")
+            logger.debug(f"unkown signal type {signal.is_buy}")
             signal = None
 
     return signal
@@ -351,9 +355,9 @@ def cci_boader(position, df: pd.DataFrame, cci_column_name, order_price_column, 
         if long_short != 1:
             if current_cci >= upper_boader:
                 if current_cci >= upper_boader * 2:
-                    print(f"Buy signal is not rose as cci is too high {current_cci}")
+                    logger.debug(f"Buy signal is not rose as cci is too high {current_cci}")
                 else:
-                    print(f"Buy signal is rose as cci over {upper_boader}: {current_cci}")
+                    logger.debug(f"Buy signal is rose as cci over {upper_boader}: {current_cci}")
                     signal = CloseBuySignal(std_name=key, price=df[order_price_column].iloc[-1])
                 trend = 1
             elif lower_boader < current_cci:
@@ -363,9 +367,9 @@ def cci_boader(position, df: pd.DataFrame, cci_column_name, order_price_column, 
         elif long_short != -1:
             if current_cci <= lower_boader:
                 if current_cci <= lower_boader * 2:
-                    print(f"Sell signal is not rose as cci is too low {current_cci}")
+                    logger.debug(f"Sell signal is not rose as cci is too low {current_cci}")
                 else:
-                    print(f"Buy signal is rose as cci over -100: {current_cci}")
+                    logger.debug(f"Buy signal is rose as cci over -100: {current_cci}")
                     signal = CloseSellSignal(std_name=key, price=df[order_price_column].iloc[-1])
             elif upper_boader > current_cci:
                 if long_short == 1:
@@ -601,7 +605,7 @@ def macd_renkorange_bb_ex(
         elif signal.is_close:
             pass
         else:
-            print(f"unkown signal type {signal.is_buy}")
+            logger.debug(f"unkown signal type {signal.is_buy}")
             signal = None
 
     return signal, __is_in_range

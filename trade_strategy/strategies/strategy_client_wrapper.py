@@ -13,7 +13,6 @@ class CascadeStrategyClient:
         self,
         clients: Union[StrategyClient, List[StrategyClient], dict],
         frames: ...,
-        logger=None,
     ) -> None:
         num_of_clients = 1
         try:
@@ -59,13 +58,10 @@ class CascadeStrategyClient:
         for frame in self.frames:
             self.signals[frame] = None
             self.last_time[frame] = None
-        if logger is None:
-            if self.__multi_client:
-                self.logger = self.st_client[0].logger
-            else:
-                self.logger = self.st_client.logger
+        if self.__multi_client:
+            self.logger = next(iter(self.st_client.values())).logger
         else:
-            self.logger = logger
+            self.logger = self.st_client.logger
         self._position = 0
 
     def _get_signal_for_a_frame(self, df, frame, position: int = None, symbol=None) -> Signal:

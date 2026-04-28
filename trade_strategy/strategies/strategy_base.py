@@ -22,29 +22,16 @@ class StrategyClient:
         volume=1,
         data_length: int = 100,
         trailing_stop=None,
+        spread_threshold: float | None = 15,
         save_signal_info=False,
-        logger=None,
     ) -> None:
-        if logger is None:
-            try:
-                with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "../settings.json")), "r") as f:
-                    settings = json.load(f)
-            except Exception as e:
-                print(f"fail to load settings file on strategy: {e}")
-                raise e
-
-            logger_config = settings["log"]
-
-            try:
-                config.dictConfig(logger_config)
-            except Exception as e:
-                print(f"fail to set configure file on strategy: {e}")
-                raise e
-
-            logger_name = "trade_strategy.strategy"
-            self.logger = getLogger(logger_name)
-        else:
-            self.logger = logger
+        try:
+            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "../settings.json")), "r") as f:
+                settings = json.load(f)
+            config.dictConfig(settings["log"])
+        except Exception as e:
+            print(f"fail to load settings file on strategy: {e}")
+        self.logger = getLogger("trade_strategy.strategy")
 
         if isinstance(idc_processes, list):
             self._idc_processes = idc_processes
@@ -55,6 +42,7 @@ class StrategyClient:
         self.client = finance_client
         self.data_length = data_length
         self.trailing_stop = trailing_stop
+        self.spread_threshold = spread_threshold
         self.market_trends = {}
         if interval_mins is None:
             self.interval_mins = self.client.frame
@@ -85,7 +73,23 @@ class StrategyClient:
             for id, stop_price in new_stops.items():
                 self.client.update_position(position=id, sl=stop_price)
         return None
-
+    
+    def _check_spread(self, signal, df):
+        if self.spread_threshold is None:
+            return signal
+        if signal is not None and signal.is_close is False:
+            spread = None
+            if "spread" in df.columns:
+                spread = df["spread"].iloc[-1]
+            elif "Spread" in df.columns:
+                spread = df["Spread"].iloc[-1]
+            if spread is not None:
+                # signal.adjust_amount_by_spread(spread)
+                if spread >= self.spread_threshold:
+                    signal = None  # do not trade when spread is too high
+                    self.logger.info(f"skip trade because of high spread: {spread}")
+        return signal
+    
     def run(self, symbols: Union[str, list], state=None) -> Signal:
         """run this strategy
 
@@ -122,13 +126,14 @@ class StrategyClient:
         for symbol in symbols:
             ohlc_df = get_dataframe(df, symbol)
             if ohlc_df.empty:
-                print("ohlc_df is empty. skipping...", symbol)
+                self.logger.warning(f"ohlc_df is empty. skipping... {symbol}")
                 continue
             if ohlc_df.iloc[-1].isnull().any() is True:
-                print("last index has null. try to run anyway.", ohlc_df.iloc[-1])
+                self.logger.debug(f"last index has null. try to run anyway. {ohlc_df.iloc[-1]}")
             symbol_positions = [pos for pos in positions if pos.symbol == symbol]
             if len(symbol_positions) == 0:
                 signal = self.get_signal(ohlc_df, None, symbol)
+                signal = self._check_spread(signal, ohlc_df)
                 if signal is not None:
                     signal.volume = self.volume
                     signal.symbol = symbol
@@ -138,6 +143,7 @@ class StrategyClient:
             else:
                 for position in symbol_positions:
                     signal = self.get_signal(ohlc_df, position, symbol)
+                    signal = self._check_spread(signal, ohlc_df)
                     if signal is not None:
                         signal.volume = self.volume
                         signal.symbol = symbol
@@ -155,9 +161,8 @@ class MultiSymbolStrategyClient(StrategyClient):
         volume=1,
         data_length: int = 100,
         save_signal_info=False,
-        logger=None,
     ) -> None:
-        super().__init__(finance_client, idc_processes, interval_mins, volume, data_length, save_signal_info, logger)
+        super().__init__(finance_client, idc_processes, interval_mins, volume, data_length, save_signal_info)
 
     def get_signal(self, df, position = None, symbols=None):
         if symbols is None:
@@ -170,7 +175,7 @@ class MultiSymbolStrategyClient(StrategyClient):
         if positions is None:
             positions = [0 for _ in range(len(symbols))]
 
-        print("please overwrite this method on an actual client.")
+        self.logger.debug("please overwrite this method on an actual client.")
 
     def run(self, symbols: Union[str, list], positions=None) -> Signal:
         """run this strategy

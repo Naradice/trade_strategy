@@ -23,7 +23,7 @@ def __close(client: fc.ClientBase, symbol, state):
     elif state == -1:
         position_side = "bid"
     else:
-        print(f"Unkown state: {state} is specified for {symbol}")
+        logger.warning(f"Unknown state: {state} is specified for {symbol}")
     result = client.close_position(symbol=symbol, position_side=position_side)
     price, position_price, price_diff, profit, suc = result
     return suc, (price, position_price, price_diff, profit)
@@ -32,21 +32,21 @@ def __close(client: fc.ClientBase, symbol, state):
 def __order(client: fc.ClientBase, symbol: str, signal: str, state: str):
     symbol = __convert_symbol(symbol)
     if signal == "buy" and state == 0:
-        print(f"buy order: {symbol}")
+        logger.info(f"buy order: {symbol}")
         suc, result = client.open_trade(is_buy=True, volume=1, order_type=0, symbol=symbol)
         return suc, result, 1
     elif signal == "sell" and state == 0:
-        print(f"sell order: {symbol}")
+        logger.info(f"sell order: {symbol}")
         suc, result = client.open_trade(is_buy=False, volume=1, order_type=0, symbol=symbol)
         return suc, result, -1
     elif "close" in signal:
-        print(f"close order: {symbol}")
+        logger.info(f"close order: {symbol}")
         suc, result = __close(client, symbol, state)
         return suc, result, 0
     elif "base" == signal:
         pass
     else:
-        print(f"Unkown signal: {signal} is specified for {symbol} with {state}")
+        logger.warning(f"Unknown signal: {signal} is specified for {symbol} with {state}")
         return False, "unexpected signal", state
 
 
@@ -93,14 +93,12 @@ def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
     RATING_KEY = "ratings"
 
     symbol_convertion = {}
-    print("determin symbols from signals: ")
     for symbol in signals.index:
-        print(symbol)
         # convert Yahoo format for JPN to common format
         new_symbol = __convert_symbol(symbol)
         symbol_convertion[new_symbol] = symbol
     symbols = list(symbol_convertion.keys())
-    print(f"add ratings for {symbols}")
+    logger.debug(f"add ratings for {symbols}")
 
     ratings = {}
     if RATING_KEY in existing_info:
@@ -119,7 +117,7 @@ def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
                 except AttributeError:
                     existing_date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
                 except Exception:
-                    print(f"can't determin update_date of {symbol}")
+                    logger.warning(f"can't determine update_date of {symbol}")
                     new_symbols.append(symbol)
                     continue
                 delta = datetime.datetime.now() - existing_date
@@ -137,10 +135,10 @@ def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
         new_ratings_df = pd.DataFrame()
         if len(new_symbols) > 0:
             ## assume columns=["mean", "var", "volume"], index=symbols
-            print("start adding get_rating with a client for new symbols")
+            logger.debug("start adding get_rating with a client for new symbols")
             new_ratings_df = client.get_rating(new_symbols)
         else:
-            print("new symbols not found. try to use existing  rating info.")
+            logger.debug("new symbols not found. try to use existing rating info.")
         rating_df = pd.concat([existing_rates_df, new_ratings_df], axis=0)
         # if provider doesn't provide rating info for some of symbols, it may be not returned.
         if len(rating_df) > 0:
@@ -152,7 +150,7 @@ def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
                 if symbol in symbol_convertion:
                     org_index.append(symbol_convertion[symbol])
                 else:
-                    print(f"Unexpectedly symbol({symbol}) is not found on symbol_conversion.")
+                    logger.warning(f"Unexpectedly symbol({symbol}) is not found on symbol_conversion.")
                     org_index.append(symbol)
             candidate_df.index = org_index
             candidate_df = pd.concat([candidate_df, signals.loc[candidate_df.index]], axis=1)
@@ -169,12 +167,12 @@ def __add_rating(client, signals, volume_threthold=10, mean_threthold=4):
                 with open("./symbols_info.json", mode="w") as fp:
                     json.dump(existing_info, fp)
             except Exception:
-                print("failed to save rating info.")
+                logger.error("failed to save rating info.")
             return True, candidate_df, remaining_df
         else:
-            print("failed to get rate. ratings object has no items.")
+            logger.error("failed to get rate. ratings object has no items.")
             return False, None, None
-    print("failed to get rate since client has no such feature")
+    logger.warning("failed to get rate since client has no such feature")
     return False, None, None
 
 
@@ -191,17 +189,17 @@ def order_by_signals(signals, finance_client: fc.ClientBase, mode="rating"):
         states = close_sig_df["state"]
         new_states = {}
         if len(close_sig_df) > 0:
-            print(f"start closing positions {list(close_sig_df.index)}")
+            logger.info(f"start closing positions {list(close_sig_df.index)}")
         for symbol in close_sig_df.index:
             signal = None
             try:
                 signal = signals[symbol]
                 state = states[symbol]
             except KeyError:
-                print(f"key {symbol} not found on signals. continue with next symbol")
+                logger.warning(f"key {symbol} not found on signals. continue with next symbol")
                 continue
             except Exception:
-                print(f"unkown error for {symbol} on order_by_signals. continue with next symbol")
+                logger.warning(f"unknown error for {symbol} on order_by_signals. continue with next symbol")
                 continue
             suc, result = __close(finance_client, symbol, state)
             new_states[symbol] = 0
@@ -213,7 +211,7 @@ def order_by_signals(signals, finance_client: fc.ClientBase, mode="rating"):
                     if suc:
                         signals = rating_df["signal"]
                         states = rating_df["state"]
-                        print("start ordering based on ratings")
+                        logger.info("start ordering based on ratings")
                         for symbol in rating_df.index:
                             signal = None
                             try:
@@ -226,11 +224,11 @@ def order_by_signals(signals, finance_client: fc.ClientBase, mode="rating"):
                                 if suc:
                                     new_states[symbol] = result_state
                         # handle remainings
-                        print("start ordering randomly")
+                        logger.info("start ordering randomly")
                         new_states_rand = __random_order(finance_client, remain_df)
                         new_states.update(new_states_rand)
                     else:
-                        print("Failed to get ratings.")
+                        logger.error("Failed to get ratings.")
                 elif mode == "random":
                     new_states = __random_order(finance_client, sig_df)
                 elif mode == "none" or mode is None:
@@ -239,11 +237,11 @@ def order_by_signals(signals, finance_client: fc.ClientBase, mode="rating"):
                     raise ValueError(f"Unkown mode {mode} is specified.")
                 return new_states
             else:
-                print("no signal specified to order.")
+                logger.info("no signal specified to order.")
         else:
-            print("unkown signal format.")
+            logger.warning("unknown signal format.")
     else:
-        print("no signals specified.")
+        logger.info("no signals specified.")
 
 
 def order_by_signal_file(file_path: str, finance_client: fc.ClientBase, mode="rating"):
@@ -252,7 +250,7 @@ def order_by_signal_file(file_path: str, finance_client: fc.ClientBase, mode="ra
             signals = json.load(fp)
         order_by_signals(signals, finance_client, mode)
     else:
-        print("file path doesn't exist")
+        logger.error(f"file path doesn't exist: {file_path}")
 
 
 def __add_state_to_signal(signals, state, symbol):
@@ -260,17 +258,17 @@ def __add_state_to_signal(signals, state, symbol):
     if signals is None:
         return None
     if len(signals) > 1:
-        print("signal rose two or more somehow.")
+        logger.warning("signal rose two or more somehow.")
         return None
     elif len(signals) > 0:
         signal = signals[0]
         signal_dict = signal.to_dict()
         signal_dict["state"] = state
         if state == 0:
-            print(f"new signal of {symbol}: {signal}")
+            logger.info(f"new signal of {symbol}: {signal}")
         elif state == 1 or state == -1:
             if signal_dict["is_close"]:
-                print(f"close signal of {symbol}: {signal}")
+                logger.info(f"close signal of {symbol}: {signal}")
         return signal_dict
     else:
         return None
@@ -313,7 +311,7 @@ def system_trade_one_time(
     client: fc.ClientBase, strategy_key: str, data_length=100, candidate_symbols: list = None, idc_processes: list = None, signal_file_path: str = None
 ):
     list_signals(client, strategy_key, data_length, candidate_symbols, idc_processes, signal_file_path)
-    print("start oders")
+    logger.info("start orders")
     order_by_signal_file(signal_file_path, client)
 
 
@@ -354,7 +352,7 @@ def list_sygnals_with_csv(
             signals[symbol] = signal_dict
         elif has_history:
             if state == 0:
-                print(f"signal of {symbol} is not raise this time. Delete previouse signal {signals[symbol]['signal']}.")
+                logger.info(f"signal of {symbol} is not raised this time. Delete previous signal {signals[symbol]['signal']}.")
                 signals.pop(symbol)
         index += 1
     with open("./signals.json", mode="w") as fp:
@@ -387,7 +385,7 @@ def list_sygnals_with_yahoo(symbols: list, frame, strategy_key: str, data_length
         return signals
     strategy = strategies.load_strategy_client(strategy_key, client, _idc_processes, {"data_length": data_length_})
     new_signals = strategy.run(symbols)
-    print(new_signals)
+    logger.info(f"new signals: {new_signals}")
     del client
     del _idc_processes
     if save_signals:

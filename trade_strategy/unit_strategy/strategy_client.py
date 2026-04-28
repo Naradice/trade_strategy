@@ -66,8 +66,7 @@ class UnitStrategyClient(StrategyClient):
         interval_mins: int = -1,
         volume: int = 1,
         data_length: int = 100,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         super().__init__(
             finance_client=finance_client,
@@ -75,8 +74,7 @@ class UnitStrategyClient(StrategyClient):
             interval_mins=interval_mins,
             volume=volume,
             data_length=data_length,
-            trailing_stop=trailing_stop,
-            logger=logger,
+            trailing_stop=trailing_stop
         )
         self._entry_strategy = entry_strategy
         self._exit_long_strategy = exit_long_strategy

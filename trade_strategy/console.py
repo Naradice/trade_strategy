@@ -16,37 +16,27 @@ except ImportError:
     ENTER_KEY = 13  # Windows Enter
     END_KEY = 3     # Ctrl+C
 
-def initialize_logger(logger=None, log_level=INFO, name="trade_strategy.main"):
-    if os.name == 'posix':
-        ENTER_KEY = 10
-        END_KEY = 3
-    elif os.name == 'nt':
-        ENTER_KEY = 13
-        END_KEY = 3
 
-    if logger is None:
-        dir = os.path.dirname(__file__)
+def initialize_logger(log_level=INFO, name="trade_strategy.main"):
+    dir = os.path.dirname(__file__)
+    try:
+        with open(os.path.join(dir, "./settings.json"), "r") as f:
+            settings = json.load(f)
+    except Exception as e:
+        print(f"fail to load settings file on strategy main: {e}")
+        raise e
+    logger_config = settings["log"]
+    if log_level is not None:
         try:
-            with open(os.path.join(dir, "./settings.json"), "r") as f:
-                settings = json.load(f)
-        except Exception as e:
-            print(f"fail to load settings file on strategy main: {e}")
-            raise e
-        logger_config = settings["log"]
-        if log_level is not None:
-            try:
-                logger_config[name]["level"] = log_level
-            except:
-                pass
-        try:
-            config.dictConfig(logger_config)
-        except Exception as e:
-            print(f"fail to set configure file on strategy main: {e}")
-            raise e
-        logger = getLogger(name)
-    else:
-        logger = logger
-    return logger
+            logger_config[name]["level"] = log_level
+        except KeyError:
+            pass
+    try:
+        config.dictConfig(logger_config)
+    except Exception as e:
+        print(f"fail to set configure file on strategy main: {e}")
+        raise e
+    return getLogger(name)
 
 
 class Command:
@@ -152,33 +142,29 @@ class InputBox:
 
 
 class Console:
-    def __init__(self, logger=None, log_level=None) -> None:
+    def __init__(self, log_level=None, log_file="trade_strategy.log", file_log_level=logging.ERROR) -> None:
         if log_level is None:
             self.log_level = INFO
         else:
             self.log_level = log_level
-        if logger is None:
-            dir = os.path.dirname(__file__)
-            try:
-                with open(os.path.join(dir, "./settings.json"), "r") as f:
-                    settings = json.load(f)
-            except Exception as e:
-                self.logger.error(f"fail to load settings file on strategy main: {e}")
-                raise e
+        self.log_file = log_file
+        self.file_log_level = file_log_level
+        dir = os.path.dirname(__file__)
+        try:
+            with open(os.path.join(dir, "./settings.json"), "r") as f:
+                settings = json.load(f)
             logger_config = settings["log"]
-            try:
-                config.dictConfig(logger_config)
-            except Exception as e:
-                self.logger.error(f"fail to set configure file on strategy main: {e}")
-                raise e
-            self.logger = getLogger("trade_strategy")
-        else:
-            self.logger = logger
+            config.dictConfig(logger_config)
+        except Exception as e:
+            print(f"Console: could not load settings.json, using basic logger ({e})")
+        self.logger = getLogger("trade_strategy")
         self.logger.setLevel(self.log_level)
         self.done = False
         self.thread = None
         self._curses_handler = None
+        self._file_handler = None
         self._attached_loggers = []
+        self._file_attached_loggers = []
 
     def _get_target_loggers(self):
         targets = []
@@ -223,13 +209,45 @@ class Console:
                 self._attached_loggers.append(target_logger)
 
     def _detach_handler(self):
-        if self._curses_handler is None:
-            return
+        if self._curses_handler is not None:
+            for target_logger in self._attached_loggers:
+                if self._curses_handler in target_logger.handlers:
+                    target_logger.removeHandler(self._curses_handler)
+            self._attached_loggers = []
 
-        for target_logger in self._attached_loggers:
-            if self._curses_handler in target_logger.handlers:
-                target_logger.removeHandler(self._curses_handler)
-        self._attached_loggers = []
+        if self._file_handler is not None:
+            for target_logger in self._file_attached_loggers:
+                if self._file_handler in target_logger.handlers:
+                    target_logger.removeHandler(self._file_handler)
+            self._file_handler.close()
+            self._file_handler = None
+            self._file_attached_loggers = []
+
+    def _attach_file_handler(self):
+        """Attach a FileHandler for the console session if one isn't already writing to log_file."""
+        for target_logger in self._get_target_loggers():
+            for h in target_logger.handlers:
+                if isinstance(h, logging.FileHandler) and h.baseFilename == os.path.abspath(self.log_file):
+                    return  # already covered by existing config
+
+        formatter = None
+        for target_logger in self._get_target_loggers():
+            for h in target_logger.handlers:
+                if h.formatter is not None:
+                    formatter = h.formatter
+                    break
+            if formatter is not None:
+                break
+
+        fh = logging.FileHandler(self.log_file, encoding="utf-8")
+        fh.setLevel(self.file_log_level)
+        if formatter is not None:
+            fh.setFormatter(formatter)
+        self._file_handler = fh
+        self._file_attached_loggers = []
+        for target_logger in self._get_target_loggers():
+            target_logger.addHandler(fh)
+            self._file_attached_loggers.append(target_logger)
 
     def _start(self, pipe):
         if not _CURSES_AVAILABLE:
@@ -246,6 +264,7 @@ class Console:
         curses_handler.setLevel(self.log_level)
         self._curses_handler = curses_handler
         self._attach_handler(curses_handler)
+        self._attach_file_handler()
         try:
             curses_handler.render()
 
@@ -314,7 +333,6 @@ class Console:
             curses.endwin()
         except Exception as e:
             self.logger.error(f"failed to close console window: {e}")
-            print(e)
         self.done = True
         if self.thread is not None:
             if self.thread is not threading.current_thread():

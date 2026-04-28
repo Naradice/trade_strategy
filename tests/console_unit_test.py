@@ -213,7 +213,7 @@ class TestConsoleLoggerAttachment(unittest.TestCase):
         other_logger = logging.getLogger("external.console_attach")
         descendant_handler = logging.NullHandler()
         handler = logging.NullHandler()
-        console = Console(logger=base_logger)
+        console = Console()
         descendant_logger.addHandler(descendant_handler)
 
         console._attach_handler(handler)

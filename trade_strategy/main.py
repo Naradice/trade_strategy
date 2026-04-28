@@ -156,7 +156,7 @@ class StrategyRunner:
         return signals
 
     def handle_signals(self, strategy: StrategyClient, signals: list):
-        for index, signal in enumerate(signals):
+        for signal in signals:
             if signal and signal.order_type is not None:
                 if signal.is_close:
                     logger.info(f"close signal is risen: {signal}")
@@ -213,20 +213,21 @@ class StrategyRunner:
 
 
 class StrategyManager:
-    def __init__(self, start_date, end_date, logger=None, log_level=INFO, console_mode=True) -> None:
+    def __init__(self, start_date, end_date, symbols=None, log_level=INFO, console_mode=True) -> None:
         if console_mode:
-            self.logger = Console(logger=logger, log_level=log_level)
+            self.logger = Console(log_level=log_level)
         else:
-            self.logger = initialize_logger(logger, log_level=log_level)
+            self.logger = initialize_logger(log_level=log_level)
         self.stop_event = threading.Event()
+        self.symbols = symbols
         self.timer = Timer(start_date=start_date, end_date=end_date, logger=self.logger)
         self.enable_long = True
         self.enable_short = True
 
     def _summary(self, results: dict):
-        print("=" * 40)
-        print("Backtest Summary")
-        print("=" * 40)
+        self.logger.info("=" * 40)
+        self.logger.info("Backtest Summary")
+        self.logger.info("=" * 40)
         any_trades = False
         for symbol, values in results.items():
             totalSignalCount = len(values)
@@ -243,15 +244,12 @@ class StrategyManager:
                     f"win_rate={win_rate:.1%}, profit={winRevenue:.4f}, loss={revenue - winRevenue:.4f}, "
                     f"revenue_ratio={revenue_ratio:.4f}"
                 )
-                print(summary_line)
                 self.logger.info(summary_line)
                 var = statistics.pvariance(values)
                 mean = statistics.mean(values)
-                stats_line = f"{symbol}: mean={mean:.4f}, variance={var:.4f}"
-                print(stats_line)
-                self.logger.info(stats_line)
+                self.logger.info(f"{symbol}: mean={mean:.4f}, variance={var:.4f}")
         if not any_trades:
-            print("No closed trades recorded.")
+            self.logger.info("No closed trades recorded.")
 
     def _handle_signal(self, strategy, signal):
         if signal and signal.order_type is not None:
@@ -305,7 +303,10 @@ class StrategyManager:
     def _start_strategy(self, strategy: StrategyClient, pipe, count=-1):
         self.logger.debug("started strategy")
         results = {}
-        symbols = strategy.client.symbols.copy()
+        if self.symbols is not None:
+            symbols = self.symbols
+        else:
+            symbols = strategy.client.symbols.copy()
         for symbol in symbols:
             results[symbol] = []
 
@@ -315,7 +316,6 @@ class StrategyManager:
                 self._handle_command(cmd)
                 if cmd == Command.end:
                     return None
-            symbols = strategy.client.symbols.copy()
             start_time = datetime.datetime.now()
             try:
                 signals = strategy.run(symbols)
@@ -330,8 +330,8 @@ class StrategyManager:
             self.runner.handle_signals(strategy, signals)
             if count % 10 == 0:
                 try:
-                    print(strategy.client.get_portfolio())
-                    print(strategy.client.get_free_margin())
+                    self.logger.info(strategy.client.get_portfolio())
+                    self.logger.info(strategy.client.get_free_margin())
                 except Exception as e:
                     logger.error(f"error occured when getting portfolio or budget: {e}")
             count += 1
@@ -420,9 +420,10 @@ class StrategyManager:
 
 
 class ParallelStrategyManager(StrategyManager):
-    def __init__(self, start_date, end_date, logger=None, log_level=INFO, console_mode=True) -> None:
-        super().__init__(start_date, end_date, logger, log_level, console_mode=console_mode)
+    def __init__(self, start_date, end_date, symbols=None, log_level=INFO, console_mode=True) -> None:
+        super().__init__(start_date, end_date, log_level, console_mode=console_mode)
         self.timer = ParallelTimer(start_date, end_date, self.logger)
+        self.symbols = symbols
 
     def summary(self):
         totalRevenue = 0
@@ -438,7 +439,7 @@ class ParallelStrategyManager(StrategyManager):
             totalWinCount += len(winList)
             totalWinRevenute += sum(winList)
         resultTxt = f"Revenute:{totalRevenue}, signal count: {totalSignalCount}, win Rate: {totalWinCount}, plus: {totalWinRevenute}, minus: {totalRevenue - totalWinRevenute}"
-        print(resultTxt)
+        self.logger.info(resultTxt)
 
     def _on_timer_pipe(self, strategies, command_child_pipe, timer_pipe):
         while self.stop_event.is_set() is False:
@@ -451,12 +452,19 @@ class ParallelStrategyManager(StrategyManager):
                     self.logger.error(f"invalid index({strategy_index}) is specified by timer event.")
             else:
                 break
+    def _get_symbols(self, strategies):
+        if self.symbols is not None:
+            return self.symbols
+        symbols = set()
+        for strategy in strategies:
+            symbols.update(strategy.client.symbols)
+        return list(symbols)
 
     def start(self, strategies: list, wait=True):
         if len(strategies) <= 1:
             raise ValueError("Length of strategy list is less than 1. Please use StrategyManager.")
         self.strategies = strategies
-        all_symbols = list(set().union(*[strategy.client.symbols for strategy in strategies]))
+        all_symbols = self._get_symbols(strategies)
         self.runner = StrategyRunner(all_symbols)
         command_parent_pipe, command_child_pipe = multiprocessing.Pipe()
         timer_parent_pipe, timer_child_pipe = multiprocessing.Pipe()

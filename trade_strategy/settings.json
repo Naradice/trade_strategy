@@ -43,6 +43,16 @@
                 "level": "INFO",
                 "handlers": ["consoleHandler", "fileHandler"],
                 "propagate": false
+            },
+            "trade_strategy.signal_trade": {
+                "level": "INFO",
+                "handlers": ["consoleHandler", "fileHandler"],
+                "propagate": false
+            },
+            "trade_strategy.strategies": {
+                "level": "INFO",
+                "handlers": ["consoleHandler", "fileHandler"],
+                "propagate": false
             }
         }
     }

@@ -30,8 +30,7 @@ class SlopeChange(StrategyClient):
         slope_threshold=5,
         ema_threshold=0.1,
         rsi_threshold=70,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         # TODO: add ema and slope if client doesn't have
         super().__init__(finance_client, idc_processes, interval_mins, volume, data_length, trailing_stop, save_signal_info, logger)
@@ -101,7 +100,7 @@ class MACDCross(StrategyClient):
 
     def __init__(self, finance_client: fc.ClientBase, macd_process=None, volume=1,
                  ohlc_columns=None,
-                 interval_mins: int = 30, data_length=100, trailing_stop=None, logger=None) -> None:
+                 interval_mins: int = 30, data_length=100, trailing_stop=None) -> None:
         """When MACD cross up, return buy signal
             When MACD cross down, return sell signal
 
@@ -113,7 +112,7 @@ class MACDCross(StrategyClient):
             volume (int, optional): The volume for the trade signals. Defaults to 1.
         """
         super().__init__(finance_client, [], interval_mins, volume=volume, data_length=data_length,
-                          trailing_stop=trailing_stop, logger=logger)
+                          trailing_stop=trailing_stop)
         if macd_process is None:
             if ohlc_columns is not None:
                 target_column = ohlc_columns[-1]
@@ -178,14 +177,13 @@ class MACDRenko(StrategyClient):
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
-        slope_window=None,
-        logger=None,
+        slope_window=None
         renko_brick_size=None,
         renko_window=None,
         trailing_stop=None,
         range_function=None,
     ) -> None:
-        super().__init__(finance_client, [], interval_mins, volume, data_length, trailing_stop=trailing_stop, logger=logger)
+        super().__init__(finance_client, [], interval_mins, volume, data_length, trailing_stop=trailing_stop)
 
         if renko_process is not None:
             if renko_process.kinds != "Renko":
@@ -297,8 +295,7 @@ class MACDRenkoSLByBB(MACDRenko):
         use_tp=False,
         interval_mins: int = -1,
         data_length=250,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         """
         add condition to open a position by Bolinger Band
@@ -324,8 +321,7 @@ class MACDRenkoSLByBB(MACDRenko):
             interval_mins=interval_mins,
             volume=volume,
             data_length=data_length,
-            trailing_stop=trailing_stop,
-            logger=logger,
+            trailing_stop=trailing_stop
         )
 
         self.add_indicaters([bolinger_process])
@@ -390,7 +386,7 @@ class CCICross(StrategyClient):
         options.update(idc_options)
         return CCICross(finance_client, **options)
 
-    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, volume=1, trailing_stop=None, logger=None) -> None:
+    def __init__(self, finance_client: fc.ClientBase, cci_process=None, interval_mins: int = 30, data_length=100, volume=1, trailing_stop=None) -> None:
         """Raise Buy/Sell signal when CCI cross up/down 0
 
         Args:
@@ -405,7 +401,7 @@ class CCICross(StrategyClient):
             Exception: when other than CCI process is provided.
         """
         super().__init__(finance_client=finance_client, idc_processes=None, interval_mins=interval_mins, volume=volume,
-                         data_length=data_length, trailing_stop=trailing_stop, logger=logger)
+                         data_length=data_length, trailing_stop=trailing_stop)
         if cci_process == None:
             cci_process = fc.fprocess.CCIProcess()
         else:
@@ -462,7 +458,7 @@ class CCIBoader(StrategyClient):
         return CCIBoader(finance_client, **options)
 
     def __init__(
-        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, volume=1, data_length=100, trailing_stop=None, logger=None
+        self, finance_client: fc.ClientBase, cci_process=None, upper=100, lower=-100, interval_mins: int = 30, volume=1, data_length=100, trailing_stop=None
     ) -> None:
         """Raise Buy/Sell signal when CCI cross up/down uppser/lower
 
@@ -482,7 +478,7 @@ class CCIBoader(StrategyClient):
         """
         super().__init__(finance_client=finance_client, idc_processes=None, 
                          interval_mins=interval_mins, volume=volume, data_length=data_length,
-                         trailing_stop=trailing_stop, logger=logger)
+                         trailing_stop=trailing_stop)
         if lower >= upper:
             raise ValueError("lower should be lower than upper")
         else:
@@ -555,12 +551,11 @@ class RangeTrade(StrategyClient):
         interval_mins: int = -1,
         volume=1,
         data_length: int = 100,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         super().__init__(finance_client=finance_client, idc_processes=None, 
                          interval_mins=interval_mins, volume=volume, data_length=data_length,
-                         trailing_stop=trailing_stop, logger=logger)
+                         trailing_stop=trailing_stop)
         ohlc_columns = finance_client.get_ohlc_columns()
         self.close_column = ohlc_columns["Close"]
         self.high_column = ohlc_columns["High"]
@@ -642,12 +637,11 @@ class MACDRenkoRange(StrategyClient):
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         super().__init__(finance_client=finance_client, idc_processes=None, 
                          interval_mins=interval_mins, volume=volume, data_length=data_length,
-                         trailing_stop=trailing_stop, logger=logger)
+                         trailing_stop=trailing_stop)
 
         if renko_process.kinds != "Renko":
             raise Exception("renko_process accept only RenkoProcess")
@@ -761,8 +755,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
         rsi_column=None,
         rsi_threshold=None,
         threshold=2,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         """
         add condition to open a position by Bolinger Band
@@ -809,8 +802,7 @@ class MACDRenkoRangeSLByBB(MACDRenkoRange):
             interval_mins=interval_mins,
             data_length=data_length,
             threshold=threshold,
-            trailing_stop=trailing_stop,
-            logger=logger,
+            trailing_stop=trailing_stop
         )
 
         self.use_tp = use_tp
@@ -982,8 +974,7 @@ class Momentum(StrategyClient):
         volume=1,
         data_length: int = 100,
         save_signal_info=False,
-        trailing_stop=None,
-        logger=None,
+        trailing_stop=None
     ) -> None:
         self.momentum_column = momentum_column
         self.short_ma_column = short_ma_column
@@ -995,7 +986,7 @@ class Momentum(StrategyClient):
         self.risk_factor = risk_factor
         super().__init__(finance_client=finance_client, idc_processes=idc_processes, 
                          interval_mins=interval_mins, volume=volume, data_length=data_length,
-                         save_signal_info=save_signal_info, trailing_stop=trailing_stop, logger=logger)
+                         save_signal_info=save_signal_info, trailing_stop=trailing_stop)
 
     def get_signal(self, df, positions: list[Position] = None, symbols: List[str] = None):
         signals = strategy.momentum_ma(
