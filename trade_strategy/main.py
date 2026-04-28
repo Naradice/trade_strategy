@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 from trade_strategy.strategies import StrategyClient
-from trade_strategy.console import Console, Command, initialize_logger
+from trade_strategy.console import Console, Command, setup_logging
 
 logger = getLogger(__name__)
 
@@ -214,10 +214,11 @@ class StrategyRunner:
 
 class StrategyManager:
     def __init__(self, start_date, end_date, symbols=None, log_level=INFO, console_mode=True) -> None:
+        setup_logging(log_level=log_level)
         if console_mode:
             self.logger = Console(log_level=log_level)
         else:
-            self.logger = initialize_logger(log_level=log_level)
+            self.logger = getLogger("trade_strategy.main")
         self.stop_event = threading.Event()
         self.symbols = symbols
         self.timer = Timer(start_date=start_date, end_date=end_date, logger=self.logger)
@@ -430,8 +431,8 @@ class ParallelStrategyManager(StrategyManager):
         totalWinCount = 0
         totalSignalCount = 0
         totalWinRevenute = 0
-        for strategy in self.strategies:
-            symbol = strategy.client.symbols[0]
+        symbols = self._get_symbols(self.strategies)
+        for symbol in symbols:
             values = self.runner.results.get(symbol, [])
             totalRevenue += sum(values)
             totalSignalCount += len(values)
@@ -452,6 +453,7 @@ class ParallelStrategyManager(StrategyManager):
                     self.logger.error(f"invalid index({strategy_index}) is specified by timer event.")
             else:
                 break
+            
     def _get_symbols(self, strategies):
         if self.symbols is not None:
             return self.symbols

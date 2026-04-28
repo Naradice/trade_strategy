@@ -1,5 +1,3 @@
-import json
-import os
 from turtle import position
 from typing import Union
 
@@ -7,7 +5,7 @@ from finance_client.client_base import ClientBase
 from finance_client.position import Position
 
 from ..signal import Signal, Trend
-from logging import getLogger, config
+from logging import getLogger
 
 
 class StrategyClient:
@@ -25,12 +23,6 @@ class StrategyClient:
         spread_threshold: float | None = 15,
         save_signal_info=False,
     ) -> None:
-        try:
-            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "../settings.json")), "r") as f:
-                settings = json.load(f)
-            config.dictConfig(settings["log"])
-        except Exception as e:
-            print(f"fail to load settings file on strategy: {e}")
         self.logger = getLogger("trade_strategy.strategy")
 
         if isinstance(idc_processes, list):

@@ -17,26 +17,31 @@ except ImportError:
     END_KEY = 3     # Ctrl+C
 
 
-def initialize_logger(log_level=INFO, name="trade_strategy.main"):
-    dir = os.path.dirname(__file__)
+_logging_configured = False
+
+
+def setup_logging(log_level=INFO, name="trade_strategy.main"):
+    """Configure logging from settings.json. Safe to call multiple times — dictConfig runs only once."""
+    global _logging_configured
+    settings_path = os.path.join(os.path.dirname(__file__), "settings.json")
     try:
-        with open(os.path.join(dir, "./settings.json"), "r") as f:
-            settings = json.load(f)
+        with open(settings_path, "r") as f:
+            logger_config = json.load(f)["log"]
     except Exception as e:
-        print(f"fail to load settings file on strategy main: {e}")
-        raise e
-    logger_config = settings["log"]
+        print(f"failed to load settings.json: {e}")
+        return
+    if not _logging_configured:
+        try:
+            config.dictConfig(logger_config)
+            _logging_configured = True
+        except Exception as e:
+            print(f"failed to configure logging: {e}")
+            return
     if log_level is not None:
         try:
-            logger_config[name]["level"] = log_level
-        except KeyError:
+            getLogger(name).setLevel(log_level)
+        except Exception:
             pass
-    try:
-        config.dictConfig(logger_config)
-    except Exception as e:
-        print(f"fail to set configure file on strategy main: {e}")
-        raise e
-    return getLogger(name)
 
 
 class Command:
@@ -149,14 +154,7 @@ class Console:
             self.log_level = log_level
         self.log_file = log_file
         self.file_log_level = file_log_level
-        dir = os.path.dirname(__file__)
-        try:
-            with open(os.path.join(dir, "./settings.json"), "r") as f:
-                settings = json.load(f)
-            logger_config = settings["log"]
-            config.dictConfig(logger_config)
-        except Exception as e:
-            print(f"Console: could not load settings.json, using basic logger ({e})")
+        setup_logging(log_level=self.log_level)
         self.logger = getLogger("trade_strategy")
         self.logger.setLevel(self.log_level)
         self.done = False
