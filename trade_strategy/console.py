@@ -327,10 +327,11 @@ class Console:
 
     def close(self):
         self.logger.debug("close console window")
-        try:
-            curses.endwin()
-        except Exception as e:
-            self.logger.error(f"failed to close console window: {e}")
+        if _CURSES_AVAILABLE:
+            try:
+                curses.endwin()
+            except Exception as e:
+                self.logger.error(f"failed to close console window: {e}")
         self.done = True
         if self.thread is not None:
             if self.thread is not threading.current_thread():

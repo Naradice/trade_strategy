@@ -495,7 +495,8 @@ class ParallelStrategyManager(StrategyManager):
             self.stop_event.set()
             self.logger.debug("strategy thred is closed")
             self.logger.debug("command thred is closed")
-            self.logger.close()
+            if hasattr(self.logger, "close"):
+                self.logger.close()
             self.logger.debug("console thred is closed")
             self.timer.done = True
 
