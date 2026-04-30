@@ -177,7 +177,7 @@ class MACDRenko(StrategyClient):
         interval_mins: int = -1,
         data_length=250,
         threshold=2,
-        slope_window=None
+        slope_window=None,
         renko_brick_size=None,
         renko_window=None,
         trailing_stop=None,
@@ -239,6 +239,7 @@ class MACDRenko(StrategyClient):
                 self.slope_signal_column,
                 self.close_column_name,
                 threshold=self.threshold,
+                range_function=self.range_function
             )
         else:
             signal = strategy.macd_renko(
@@ -249,6 +250,7 @@ class MACDRenko(StrategyClient):
                 self.macd_signal_column,
                 self.close_column_name,
                 threshold=self.threshold,
+                range_function=self.range_function
             )
         if signal is not None:
             signal.volume = self.volume

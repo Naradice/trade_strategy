@@ -12,22 +12,7 @@ from finance_client import db
 from finance_client.fprocess.fprocess.idcprocess import *
 from finance_client.fprocess import fprocess
 
-from logging import getLogger, config
-
-try:
-    with open(os.path.join(module_path, "trade_strategy/settings.json"), "r") as f:
-        settings = json.load(f)
-except Exception as e:
-    print(f"fail to load settings file: {e}")
-    raise e
-
 dotenv.load_dotenv()
-logger_config = settings["log"]
-log_file_base_name = logger_config["handlers"]["fileHandler"]["filename"]
-log_path = f'./{log_file_base_name}_mrenko_{datetime.datetime.now().strftime("%Y%m%d")}.log'
-logger_config["handlers"]["fileHandler"]["filename"] = log_path
-config.dictConfig(logger_config)
-logger = getLogger("trade_strategy.back_test")
 
 file_path = os.path.abspath("L:/data/fx/OANDA-Japan MT5 Live/mt5_USDJPY_h1.csv")
 frame = 60
@@ -83,11 +68,11 @@ def MACDRenko(user, provider="csv", slope=5, threshold=2, atr_window=None, brick
     else:
         renko_p = RenkoProcess(window=atr_window, ohlc_column=ohlc_columns)
     st1 = ts.strategies.MACDRenko(client, renko_p, macd_p, slope_window=slope, volume=1,
-                                  interval_mins=0, data_length=100, logger=logger, threshold=threshold,
+                                  interval_mins=0, data_length=100, threshold=threshold,
                                   range_function=range_function, trailing_stop=trailing_stop)
     start_date = datetime.datetime.now()
     end_date = start_date + datetime.timedelta(minutes=MINUTES_TO_RUN)
-    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, logger=logger, console_mode=True)
+    manager = ts.StrategyManager(start_date=start_date, end_date=end_date, console_mode=True)
     manager.start(st1, wait=True)
 
 

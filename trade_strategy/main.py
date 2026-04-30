@@ -373,9 +373,19 @@ class StrategyManager:
                     while s_t.is_alive():
                         s_t.join(timeout=1.0)
                 finally:
+                    self._summary(self.runner.results)
+                    if hasattr(self.logger, "input"):
+                        self.logger.info("Backtest complete. Type /exit to close.")
+                        console_thread = getattr(self.logger, "thread", None)
+                        while True:
+                            if parent_pipe.poll(1.0):
+                                cmd = parent_pipe.recv()
+                                if cmd == Command.end:
+                                    break
+                            if console_thread and not console_thread.is_alive():
+                                break
                     if hasattr(self.logger, "close"):
                         self.logger.close()
-                    self._summary(self.runner.results)
 
     def _on_timer_event(self, strategy, pipe, timer_event: threading.Event):
         while self.stop_event.is_set() is False:
