@@ -25,8 +25,9 @@ def __close(client: fc.ClientBase, symbol, state):
     else:
         logger.warning(f"Unknown state: {state} is specified for {symbol}")
     result = client.close_position(symbol=symbol, position_side=position_side)
-    price, position_price, price_diff, profit, suc = result
-    return suc, (price, position_price, price_diff, profit)
+    if result.error:
+        logger.error(f"failed to close position for {symbol}: {result.msg}")
+    return not result.error, (result.price, result.entry_price, result.price_diff, result.profit)
 
 
 def __order(client: fc.ClientBase, symbol: str, signal: str, state: str):
